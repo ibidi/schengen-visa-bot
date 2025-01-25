@@ -853,3 +853,65 @@ File "/Users/ibidi/Desktop/vize/sevgililer-günü/schengen-visa-bot/bot.py", l
 2025-01-25 23:49:08,979 [INFO] visa_bot - Login sayfası açılıyor...
 File "/Users/ibidi/Desktop/vize/sevgililer-günü/schengen-visa-bot/bot.py", line 238
 -------------------
+2025-01-25 23:49:19,576 [ERROR] visa_bot - Randevu kontrolü sırasında hata: Message: 
+Stacktrace:
+0   chromedriver                        0x000000010304e7b8 cxxbridge1$str$ptr + 2598452
+1   chromedriver                        0x0000000103046ff8 cxxbridge1$str$ptr + 2567796
+2   chromedriver                        0x0000000102be7f0c cxxbridge1$string$len + 88260
+3   chromedriver                        0x0000000102c2d000 cxxbridge1$string$len + 371128
+4   chromedriver                        0x0000000102c67148 cxxbridge1$string$len + 609024
+5   chromedriver                        0x0000000102c20e1c cxxbridge1$string$len + 321492
+6   chromedriver                        0x0000000102c21a64 cxxbridge1$string$len + 324636
+7   chromedriver                        0x00000001030196d4 cxxbridge1$str$ptr + 2381136
+8   chromedriver                        0x000000010301c9f4 cxxbridge1$str$ptr + 2394224
+9   chromedriver                        0x000000010300003c cxxbridge1$str$ptr + 2277048
+10  chromedriver                        0x000000010301d2b4 cxxbridge1$str$ptr + 2396464
+11  chromedriver                        0x0000000102ff1c04 cxxbridge1$str$ptr + 2218624
+12  chromedriver                        0x0000000103037d60 cxxbridge1$str$ptr + 2505692
+13  chromedriver                        0x0000000103037edc cxxbridge1$str$ptr + 2506072
+14  chromedriver                        0x0000000103046c6c cxxbridge1$str$ptr + 2566888
+15  libsystem_pthread.dylib             0x00000001860972e4 _pthread_start + 136
+16  libsystem_pthread.dylib             0x00000001860920fc thread_start + 8
+
+File "/Users/ibidi/Desktop/vize/sevgililer-günü/schengen-visa-bot/bot.py", line 295
+-------------------
+2025-01-25 23:49:19,577 [DEBUG] visa_bot - Randevu kontrolü tamamlandı
+File "/Users/ibidi/Desktop/vize/sevgililer-günü/schengen-visa-bot/bot.py", line 304
+-------------------
+2025-01-25 23:50:19,579 [DEBUG] visa_bot - Randevu kontrolü başlıyor...
+File "/Users/ibidi/Desktop/vize/sevgililer-günü/schengen-visa-bot/bot.py", line 302
+-------------------
+2025-01-25 23:50:20,975 [INFO] visa_bot - Login sayfası açılıyor...
+File "/Users/ibidi/Desktop/vize/sevgililer-günü/schengen-visa-bot/bot.py", line 238
+-------------------
+2025-01-25 23:50:31,475 [ERROR] visa_bot - Randevu kontrolü sırasında hata: Message: 
+Stacktrace:
+0   chromedriver                        0x0000000100d127b8 cxxbridge1$str$ptr + 2598452
+1   chromedriver                        0x0000000100d0aff8 cxxbridge1$str$ptr + 2567796
+2   chromedriver                        0x00000001008abf0c cxxbridge1$string$len + 88260
+3   chromedriver                        0x00000001008f1000 cxxbridge1$string$len + 371128
+4   chromedriver                        0x000000010092b148 cxxbridge1$string$len + 609024
+5   chromedriver                        0x00000001008e4e1c cxxbridge1$string$len + 321492
+6   chromedriver                        0x00000001008e5a64 cxxbridge1$string$len + 324636
+7   chromedriver                        0x0000000100cdd6d4 cxxbridge1$str$ptr + 2381136
+8   chromedriver                        0x0000000100ce09f4 cxxbridge1$str$ptr + 2394224
+9   chromedriver                        0x0000000100cc403c cxxbridge1$str$ptr + 2277048
+10  chromedriver                        0x0000000100ce12b4 cxxbridge1$str$ptr + 2396464
+11  chromedriver                        0x0000000100cb5c04 cxxbridge1$str$ptr + 2218624
+12  chromedriver                        0x0000000100cfbd60 cxxbridge1$str$ptr + 2505692
+13  chromedriver                        0x0000000100cfbedc cxxbridge1$str$ptr + 2506072
+14  chromedriver                        0x0000000100d0ac6c cxxbridge1$str$ptr + 2566888
+15  libsystem_pthread.dylib             0x00000001860972e4 _pthread_start + 136
+16  libsystem_pthread.dylib             0x00000001860920fc thread_start + 8
+
+File "/Users/ibidi/Desktop/vize/sevgililer-günü/schengen-visa-bot/bot.py", line 295
+-------------------
+2025-01-25 23:50:31,476 [DEBUG] visa_bot - Randevu kontrolü tamamlandı
+File "/Users/ibidi/Desktop/vize/sevgililer-günü/schengen-visa-bot/bot.py", line 304
+-------------------
+2025-01-25 23:51:31,463 [DEBUG] visa_bot - Randevu kontrolü başlıyor...
+File "/Users/ibidi/Desktop/vize/sevgililer-günü/schengen-visa-bot/bot.py", line 302
+-------------------
+2025-01-25 23:51:32,902 [INFO] visa_bot - Login sayfası açılıyor...
+File "/Users/ibidi/Desktop/vize/sevgililer-günü/schengen-visa-bot/bot.py", line 238
+-------------------

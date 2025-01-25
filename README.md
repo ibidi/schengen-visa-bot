@@ -57,3 +57,12 @@ Herhangi bir katkıda bulunmak isterseniz, lütfen bir pull request gönderin ve
 
 ## Lisans
 Bu proje MIT Lisansı altında lisanslanmıştır.
+
+MIT Lisansı
+
+Copyright (c) 2025 [ibidi]
+
+İzin verilir, kopyalanabilir ve dağıtılabilir, ancak aşağıdaki koşullara uyulmalıdır:
+
+1. Yukarıdaki telif hakkı bildirimi ve bu izin bildirimi, tüm kopyalarda veya önemli bir kısmında yer almalıdır.
+2. Bu yazılım, "olduğu gibi" sağlanmaktadır ve hiçbir garanti verilmemektedir. Bu, açık veya zımni, ticari elverişlilik veya belirli bir amaca uygunluk dahil, ancak bunlarla sınırlı olmamak üzere, garantileri içerir. Yazar veya telif hakkı sahipleri, bu yazılımın kullanımından kaynaklanan herhangi bir talep, zarar veya diğer yükümlülüklerden sorumlu değildir.

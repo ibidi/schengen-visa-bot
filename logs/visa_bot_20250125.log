@@ -915,3 +915,28 @@ File "/Users/ibidi/Desktop/vize/sevgililer-günü/schengen-visa-bot/bot.py", l
 2025-01-25 23:51:32,902 [INFO] visa_bot - Login sayfası açılıyor...
 File "/Users/ibidi/Desktop/vize/sevgililer-günü/schengen-visa-bot/bot.py", line 238
 -------------------
+2025-01-25 23:51:43,439 [ERROR] visa_bot - Randevu kontrolü sırasında hata: Message: 
+Stacktrace:
+0   chromedriver                        0x00000001033727b8 cxxbridge1$str$ptr + 2598452
+1   chromedriver                        0x000000010336aff8 cxxbridge1$str$ptr + 2567796
+2   chromedriver                        0x0000000102f0bf0c cxxbridge1$string$len + 88260
+3   chromedriver                        0x0000000102f51000 cxxbridge1$string$len + 371128
+4   chromedriver                        0x0000000102f8b148 cxxbridge1$string$len + 609024
+5   chromedriver                        0x0000000102f44e1c cxxbridge1$string$len + 321492
+6   chromedriver                        0x0000000102f45a64 cxxbridge1$string$len + 324636
+7   chromedriver                        0x000000010333d6d4 cxxbridge1$str$ptr + 2381136
+8   chromedriver                        0x00000001033409f4 cxxbridge1$str$ptr + 2394224
+9   chromedriver                        0x000000010332403c cxxbridge1$str$ptr + 2277048
+10  chromedriver                        0x00000001033412b4 cxxbridge1$str$ptr + 2396464
+11  chromedriver                        0x0000000103315c04 cxxbridge1$str$ptr + 2218624
+12  chromedriver                        0x000000010335bd60 cxxbridge1$str$ptr + 2505692
+13  chromedriver                        0x000000010335bedc cxxbridge1$str$ptr + 2506072
+14  chromedriver                        0x000000010336ac6c cxxbridge1$str$ptr + 2566888
+15  libsystem_pthread.dylib             0x00000001860972e4 _pthread_start + 136
+16  libsystem_pthread.dylib             0x00000001860920fc thread_start + 8
+
+File "/Users/ibidi/Desktop/vize/sevgililer-günü/schengen-visa-bot/bot.py", line 295
+-------------------
+2025-01-25 23:51:43,440 [DEBUG] visa_bot - Randevu kontrolü tamamlandı
+File "/Users/ibidi/Desktop/vize/sevgililer-günü/schengen-visa-bot/bot.py", line 304
+-------------------

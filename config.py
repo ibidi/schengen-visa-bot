@@ -14,7 +14,7 @@ USER_EMAIL = os.getenv('USER_EMAIL')
 USER_PASSWORD = os.getenv('USER_PASSWORD')
 
 # İzin verilen kullanıcılar
-ALLOWED_USERS = {int(user_id.strip()) for user_id in os.getenv('ALLOWED_USERS', '').split(',')}
+ALLOWED_USERS = {int(user_id.strip()) for user_id in os.getenv('ALLOWED_USERS', '').split(',') if user_id.strip()}
 ADMIN_USER_ID = int(os.getenv('ADMIN_USER_ID'))
 
 # URL'ler

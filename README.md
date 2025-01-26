@@ -28,7 +28,7 @@ Bot, aşağıdaki hataları yönetir:
 ## Kurulum
 1. Depoyu klonlayın:
    ```bash
-   git clone <repo-url>
+   git clone https://github.com/ibidi/schengen-visa-bot
    cd schengen-visa-bot
    ```
 2. Gerekli bağımlılıkları yükleyin:

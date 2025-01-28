@@ -3,16 +3,15 @@ import sys
 import logging
 import json
 import asyncio
-import aiohttp
+import requests
+import telebot
+from telebot import types
 from dotenv import load_dotenv
-from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    CallbackQueryHandler,
-    ConversationHandler,
-    ContextTypes
-)
+import time
+import urllib3
+
+# SSL uyarılarını devre dışı bırak
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Load environment variables
 load_dotenv()
@@ -88,265 +87,212 @@ def format_date(date_str):
 
 class AppointmentChecker:
     def __init__(self):
+        self.bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
         self.country = None
         self.city = None
         self.frequency = None
-        self.application = None
         self.running = False
         self.task = None
         self.active_checks = {}  # chat_id: task dictionary
-
-    def set_parameters(self, country, city, frequency):
-        """Parametreleri güncelle"""
-        self.country = country
-        self.city = city
-        self.frequency = frequency
-
-    async def init_bot(self):
-        """Initialize the bot"""
-        self.application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
         self.setup_handlers()
-        await self.application.initialize()
-        await self.application.start()
-        return self.application
+        self.loop = None
 
     def setup_handlers(self):
-        """Set up the command handlers"""
-        conv_handler = ConversationHandler(
-            entry_points=[CommandHandler('start', self.start_command)],
-            states={
-                SELECTING_COUNTRY: [CallbackQueryHandler(self.country_callback)],
-                SELECTING_CITY: [CallbackQueryHandler(self.city_callback)],
-                SELECTING_FREQUENCY: [CallbackQueryHandler(self.frequency_callback)],
-            },
-            fallbacks=[CommandHandler('cancel', self.cancel_command)],
-        )
+        @self.bot.message_handler(commands=['start'])
+        def start_command(message):
+            markup = types.InlineKeyboardMarkup()
+            for country_code, country_name in COUNTRIES_TR.items():
+                markup.add(types.InlineKeyboardButton(country_name, callback_data=f"country_{country_code}"))
+            self.bot.send_message(message.chat.id, "🌍 Hoş geldiniz! Lütfen randevu kontrolü yapmak istediğiniz ülkeyi seçin:", reply_markup=markup)
 
-        self.application.add_handler(conv_handler)
-        self.application.add_handler(CommandHandler('help', self.help_command))
-        self.application.add_handler(CommandHandler('stop', self.stop_command))
-        self.application.add_handler(CommandHandler('status', self.status_command))
-
-    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Start command handler"""
-        keyboard = []
-        for country_code, country_name in COUNTRIES_TR.items():
-            keyboard.append([InlineKeyboardButton(country_name, callback_data=f"country_{country_code}")])
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(
-            "🌍 Hoş geldiniz! Lütfen randevu kontrolü yapmak istediğiniz ülkeyi seçin:",
-            reply_markup=reply_markup
-        )
-        return SELECTING_COUNTRY
-
-    async def country_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Country selection callback"""
-        query = update.callback_query
-        await query.answer()
-        
-        country = query.data.split('_')[1]
-        context.user_data['country'] = country
-
-        # Şehir seçim menüsü
-        cities = {
-            '1': 'Ankara',
-            '2': 'Istanbul',
-            '3': 'Izmir',
-            '4': 'Antalya',
-            '5': 'Gaziantep',
-            '6': 'Bursa',
-            '7': 'Antalya',
-            '8': 'Edirne',
-        }
-        
-        keyboard = []
-        for city_code, city_name in cities.items():
-            keyboard.append([InlineKeyboardButton(city_name, callback_data=f"city_{city_name}")])
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            f"🏢 {COUNTRIES_TR[country]} için şehir seçin:",
-            reply_markup=reply_markup
-        )
-        return SELECTING_CITY
-
-    async def city_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """City selection callback"""
-        query = update.callback_query
-        await query.answer()
-        
-        city = query.data.split('_')[1]
-        context.user_data['city'] = city
-
-        # Kontrol sıklığı seçim menüsü
-        frequencies = [
-            ('5 dakika', 5),
-            ('15 dakika', 15),
-            ('30 dakika', 30),
-            ('1 saat', 60)
-        ]
-        
-        keyboard = []
-        for freq_name, freq_value in frequencies:
-            keyboard.append([InlineKeyboardButton(freq_name, callback_data=f"freq_{freq_value}")])
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            "⏰ Kontrol sıklığını seçin:",
-            reply_markup=reply_markup
-        )
-        return SELECTING_FREQUENCY
-
-    async def frequency_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Frequency selection callback"""
-        query = update.callback_query
-        await query.answer()
-        
-        frequency = int(query.data.split('_')[1])
-        chat_id = str(update.effective_chat.id)
-        
-        # Mevcut kontrolü durdur
-        if chat_id in self.active_checks:
-            self.active_checks[chat_id].cancel()
-        
-        # Yeni kontrol başlat
-        self.country = context.user_data['country']
-        self.city = context.user_data['city']
-        self.frequency = frequency
-        
-        task = asyncio.create_task(self.start_checking_for_chat(chat_id))
-        self.active_checks[chat_id] = task
-        
-        await query.edit_message_text(
-            f"✅ Randevu kontrolü başlatıldı!\n\n"
-            f"🌍 Ülke: {COUNTRIES_TR[self.country]}\n"
-            f"🏢 Şehir: {self.city}\n"
-            f"⏰ Kontrol sıklığı: {frequency} dakika\n\n"
-            "Uygun randevu bulunduğunda size bildirim göndereceğim.\n"
-            "Kontrolleri durdurmak için /stop komutunu kullanabilirsiniz."
-        )
-        return ConversationHandler.END
-
-    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Help command handler"""
-        help_text = (
-            "🤖 Mevcut komutlar:\n\n"
-            "/start - Yeni randevu kontrolü başlat\n"
-            "/stop - Aktif kontrolleri durdur\n"
-            "/status - Mevcut kontrol durumunu göster\n"
-            "/help - Bu yardım mesajını göster\n"
-            "/cancel - Mevcut işlemi iptal et"
-        )
-        await update.message.reply_text(help_text)
-
-    async def stop_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Stop command handler"""
-        chat_id = str(update.effective_chat.id)
-        if chat_id in self.active_checks:
-            self.active_checks[chat_id].cancel()
-            del self.active_checks[chat_id]
-            await update.message.reply_text("🛑 Randevu kontrolleri durduruldu.")
-        else:
-            await update.message.reply_text("❌ Aktif bir randevu kontrolü bulunamadı.")
-
-    async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Status command handler"""
-        chat_id = str(update.effective_chat.id)
-        if chat_id in self.active_checks:
-            status_text = (
-                "📊 Mevcut Kontrol Durumu:\n\n"
-                f"🌍 Ülke: {COUNTRIES_TR[self.country]}\n"
-                f"🏢 Şehir: {self.city}\n"
-                f"⏰ Kontrol sıklığı: {self.frequency} dakika"
+        @self.bot.callback_query_handler(func=lambda call: call.data.startswith('country_'))
+        def country_callback(call):
+            country = call.data.split('_')[1]
+            self.country = country
+            
+            markup = types.InlineKeyboardMarkup()
+            cities = {
+                '1': 'Ankara',
+                '2': 'Istanbul',
+                '3': 'Izmir',
+                '4': 'Antalya',
+                '5': 'Gaziantep',
+                '6': 'Bursa',
+                '7': 'Antalya',
+                '8': 'Edirne',
+            }
+            for city_code, city_name in cities.items():
+                markup.add(types.InlineKeyboardButton(city_name, callback_data=f"city_{city_name}"))
+            
+            self.bot.edit_message_text(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                text=f"🏢 {COUNTRIES_TR[country]} için şehir seçin:",
+                reply_markup=markup
             )
-        else:
-            status_text = "❌ Aktif bir randevu kontrolü bulunmuyor.\n\nYeni kontrol başlatmak için /start komutunu kullanın."
-        
-        await update.message.reply_text(status_text)
 
-    async def cancel_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Cancel command handler"""
-        await update.message.reply_text(
-            "❌ İşlem iptal edildi.\n\nYeni bir kontrol başlatmak için /start komutunu kullanabilirsiniz."
-        )
-        return ConversationHandler.END
+        @self.bot.callback_query_handler(func=lambda call: call.data.startswith('city_'))
+        def city_callback(call):
+            city = call.data.split('_')[1]
+            self.city = city
+            
+            markup = types.InlineKeyboardMarkup()
+            frequencies = [
+                ('5 dakika', 5),
+                ('15 dakika', 15),
+                ('30 dakika', 30),
+                ('1 saat', 60)
+            ]
+            for freq_name, freq_value in frequencies:
+                markup.add(types.InlineKeyboardButton(freq_name, callback_data=f"freq_{freq_value}"))
+            
+            self.bot.edit_message_text(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                text="⏰ Kontrol sıklığını seçin:",
+                reply_markup=markup
+            )
 
-    async def start_checking_for_chat(self, chat_id):
-        """Start checking appointments for a specific chat"""
-        while True:
-            try:
-                await self.check_appointments()
-                await asyncio.sleep(self.frequency * 60)
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error(f"Kontrol sırasında hata: {str(e)}")
-                await asyncio.sleep(5)
+        @self.bot.callback_query_handler(func=lambda call: call.data.startswith('freq_'))
+        def frequency_callback(call):
+            frequency = int(call.data.split('_')[1])
+            self.frequency = frequency + 1  # 1 dakika ekstra ekliyoruz
+            chat_id = str(call.message.chat.id)
+            
+            if chat_id in self.active_checks:
+                self.stop_checking(chat_id)
+            
+            self.start_checking(chat_id)
+            
+            self.bot.edit_message_text(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                text=f"✅ Randevu kontrolü başlatıldı!\n\n"
+                     f"🌍 Ülke: {COUNTRIES_TR[self.country]}\n"
+                     f"🏢 Şehir: {self.city}\n"
+                     f"⏰ Kontrol sıklığı: {self.frequency} dakika\n\n"
+                     "Uygun randevu bulunduğunda size bildirim göndereceğim.\n"
+                     "Kontrolleri durdurmak için /stop komutunu kullanabilirsiniz."
+            )
 
-    async def check_appointments(self):
-        """API'den randevu kontrolü yap"""
+        @self.bot.message_handler(commands=['stop'])
+        def stop_command(message):
+            chat_id = str(message.chat.id)
+            if chat_id in self.active_checks:
+                self.stop_checking(chat_id)
+                self.bot.reply_to(message, "🛑 Randevu kontrolleri durduruldu.")
+            else:
+                self.bot.reply_to(message, "❌ Aktif bir randevu kontrolü bulunamadı.")
+
+        @self.bot.message_handler(commands=['status'])
+        def status_command(message):
+            chat_id = str(message.chat.id)
+            if chat_id in self.active_checks:
+                status_text = (
+                    "📊 Mevcut Kontrol Durumu:\n\n"
+                    f"🌍 Ülke: {COUNTRIES_TR[self.country]}\n"
+                    f"🏢 Şehir: {self.city}\n"
+                    f"⏰ Kontrol sıklığı: {self.frequency} dakika"
+                )
+            else:
+                status_text = "❌ Aktif bir randevu kontrolü bulunmuyor.\n\nYeni kontrol başlatmak için /start komutunu kullanın."
+            
+            self.bot.reply_to(message, status_text)
+
+        @self.bot.message_handler(commands=['help'])
+        def help_command(message):
+            help_text = (
+                "🤖 Mevcut komutlar:\n\n"
+                "/start - Yeni randevu kontrolü başlat\n"
+                "/stop - Aktif kontrolleri durdur\n"
+                "/status - Mevcut kontrol durumunu göster\n"
+                "/help - Bu yardım mesajını göster"
+            )
+            self.bot.reply_to(message, help_text)
+
+    def start_checking(self, chat_id):
+        """Kontrol işlemini başlat"""
+        def check_loop():
+            while True:
+                try:
+                    self.check_appointments_sync()
+                except Exception as e:
+                    logger.error(f"Kontrol sırasında hata: {str(e)}")
+                finally:
+                    time.sleep(self.frequency * 60)
+
+        import threading
+        thread = threading.Thread(target=check_loop)
+        thread.daemon = True
+        thread.start()
+        self.active_checks[chat_id] = thread
+
+    def stop_checking(self, chat_id):
+        """Kontrol işlemini durdur"""
+        if chat_id in self.active_checks:
+            del self.active_checks[chat_id]
+
+    def check_appointments_sync(self):
+        """Senkron randevu kontrolü"""
         try:
-            conn = aiohttp.TCPConnector(ssl=False)
-            async with aiohttp.ClientSession(connector=conn) as session:
-                async with session.get(API_URL) as response:
-                    if response.status != 200:
-                        raise Exception(f"API yanıt vermedi: {response.status}")
+            response = requests.get(API_URL, verify=False)
+            if response.status_code != 200:
+                raise Exception(f"API yanıt vermedi: {response.status_code}")
+            
+            appointments = response.json()
+            available_appointments = []
+            
+            for appointment in appointments:
+                appointment_date = appointment.get('appointment_date')
+                if not appointment_date:
+                    continue
+                
+                if (appointment['source_country'] == 'Turkiye' and 
+                    appointment['mission_country'].lower() == self.country.lower() and 
+                    self.city.lower() in appointment['center_name'].lower()):
                     
-                    appointments = await response.json()
-                    available_appointments = []
-                    
-                    for appointment in appointments:
-                        appointment_date = appointment.get('appointment_date')
-                        if not appointment_date:
-                            continue
-                        
-                        if (appointment['source_country'] == 'Turkiye' and 
-                            appointment['mission_country'].lower() == self.country.lower() and 
-                            self.city.lower() in appointment['center_name'].lower()):
-                            
-                            available_appointments.append({
-                                'country': appointment['mission_country'],
-                                'city': appointment['center_name'],
-                                'date': appointment_date,
-                                'category': appointment['visa_category'],
-                                'subcategory': appointment['visa_subcategory'],
-                                'link': appointment['book_now_link']
-                            })
+                    available_appointments.append({
+                        'country': appointment['mission_country'],
+                        'city': appointment['center_name'],
+                        'date': appointment_date,
+                        'category': appointment['visa_category'],
+                        'subcategory': appointment['visa_subcategory'],
+                        'link': appointment['book_now_link']
+                    })
 
-                    if available_appointments:
-                        available_appointments.sort(key=lambda x: x['date'])
-                        
-                        for appt in available_appointments:
-                            country_tr = COUNTRIES_TR.get(appt['country'], appt['country'])
-                            formatted_date = format_date(appt['date'])
+            if available_appointments:
+                available_appointments.sort(key=lambda x: x['date'])
+                
+                for appt in available_appointments:
+                    country_tr = COUNTRIES_TR.get(appt['country'], appt['country'])
+                    formatted_date = format_date(appt['date'])
 
-                            message = f"🎉 {country_tr} için randevu bulundu!\n\n"
-                            message += f"🏢 Merkez: {appt['city']}\n"
-                            message += f"📅 Tarih: {formatted_date}\n"
-                            message += f"📋 Kategori: {appt['category']}\n"
-                            if appt['subcategory']:
-                                message += f"📝 Alt Kategori: {appt['subcategory']}\n"
-                            message += f"\n🔗 Randevu Linki:\n{appt['link']}"
-                            
-                            await self.send_notification(message)
-                        
-                        return True
+                    message = f"🎉 {country_tr} için randevu bulundu!\n\n"
+                    message += f"🏢 Merkez: {appt['city']}\n"
+                    message += f"📅 Tarih: {formatted_date}\n"
+                    message += f"📋 Kategori: {appt['category']}\n"
+                    if appt['subcategory']:
+                        message += f"📝 Alt Kategori: {appt['subcategory']}\n"
+                    message += f"\n🔗 Randevu Linki:\n{appt['link']}"
                     
-                    logger.info(f"Uygun randevu bulunamadı: {self.country} - {self.city}")
-                    return False
+                    self.send_notification(message)
+                
+                return True
+            
+            logger.info(f"Uygun randevu bulunamadı: {self.country} - {self.city}")
+            return False
 
         except Exception as e:
             error_message = f"❌ API kontrolü sırasında hata: {str(e)}"
             logger.error(error_message)
-            await self.send_notification(error_message)
+            self.send_notification(error_message)
             return False
 
-    async def send_notification(self, message):
+    def send_notification(self, message):
         """Bildirim gönder"""
         logger.info(message)
         try:
-            await self.application.bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+            self.bot.send_message(TELEGRAM_CHAT_ID, message)
         except Exception as e:
             logger.error(f"Telegram bildirimi gönderilemedi: {str(e)}")
             print(message)
@@ -420,42 +366,50 @@ def get_user_input():
     
     return selected_country, selected_city, frequency
 
-async def main():
-    """Ana program"""
+def main():
+    """Ana program - Terminal modu"""
     checker = AppointmentChecker()
     
-    # Terminal arayüzü için
-    if len(sys.argv) > 1 and sys.argv[1] == '--terminal':
-        await checker.init_bot()
-        
-        while True:
+    while True:
+        try:
+            country, city, frequency = get_user_input()
+            checker.country = country
+            checker.city = city
+            checker.frequency = frequency + 1  # 1 dakika ekstra ekliyoruz
+            print(f"\n{country} için {city} şehrinde randevu kontrolü başlatılıyor...")
+            print(f"Kontrol sıklığı: {checker.frequency} dakika")
+            print("\nProgram çalışıyor... Durdurmak için Ctrl+C'ye basın.\n")
+            
+            checker.start_checking(TELEGRAM_CHAT_ID)
+            
+            # Ana thread'i canlı tut
             try:
-                country, city, frequency = get_user_input()
-                checker.set_parameters(country, city, frequency)
-                print(f"\n{country} için {city} şehrinde randevu kontrolü başlatılıyor...")
-                print(f"Kontrol sıklığı: {frequency} dakika")
-                print("\nProgram çalışıyor... Durdurmak için Ctrl+C'ye basın.\n")
-                
-                checker.task = asyncio.create_task(checker.start_checking_for_chat(TELEGRAM_CHAT_ID))
-                await checker.task
-                
+                while True:
+                    time.sleep(1)
             except KeyboardInterrupt:
-                print("\nProgram durduruluyor...")
-                if checker.task:
-                    checker.task.cancel()
-                await checker.application.stop()
+                checker.stop_checking(TELEGRAM_CHAT_ID)
                 break
-            except Exception as e:
-                print(f"\nBeklenmeyen hata: {str(e)}")
-                continue
-    else:
-        # Telegram bot arayüzü için
-        await checker.init_bot()
-        await checker.application.run_polling(allowed_updates=Update.ALL_TYPES)
+            
+        except KeyboardInterrupt:
+            print("\nProgram durduruluyor...")
+            checker.stop_checking(TELEGRAM_CHAT_ID)
+            break
+        except Exception as e:
+            print(f"\nBeklenmeyen hata: {str(e)}")
+            continue
+
+def run_bot():
+    """Normal bot modu için başlatıcı"""
+    checker = AppointmentChecker()
+    print("Bot başlatılıyor...")
+    checker.bot.infinity_polling()
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        if len(sys.argv) > 1 and sys.argv[1] == '--terminal':
+            main()
+        else:
+            run_bot()
     except KeyboardInterrupt:
         print("\nProgram sonlandırıldı.")
     except Exception as e:

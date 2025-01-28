@@ -1,56 +1,84 @@
-# VFS Global Vize Randevu Takip Botu
+# 🌍 Schengen Vize Randevu Kontrol Botu
 
-Bu Telegram botu, VFS Global üzerinden vize randevularını otomatik olarak takip eder ve uygun randevular bulunduğunda size bildirim gönderir.
+Bu bot, Schengen vizesi için randevu kontrolü yapmanızı sağlayan bir Python uygulamasıdır. Bot, belirtilen ülke ve şehir için düzenli aralıklarla randevu kontrolü yapar ve uygun randevu bulunduğunda Telegram üzerinden bildirim gönderir.
 
-## Özellikler
+## 🚀 Özellikler
 
-- VFS Global websitesini düzenli olarak kontrol eder
-- Yeni randevular bulunduğunda Telegram üzerinden bildirim gönderir
-- Kolay kullanım için basit komutlar
-- Çoklu kullanıcı desteği
+- 17 farklı Schengen ülkesi için randevu kontrolü
+- 8 farklı Türkiye şehrinden randevu arama
+- Telegram üzerinden anlık bildirimler
+- Özelleştirilebilir kontrol sıklığı
+- Kullanıcı dostu menü arayüzü
 
-## Kurulum
+## 📋 Gereksinimler
 
-1. Gerekli Python paketlerini yükleyin:
+- Python 3.7+
+- Telegram Bot Token
+- Telegram Chat ID
+
+## 🛠️ Kurulum
+
+1. Repoyu klonlayın:
+```bash
+git clone https://github.com/yourusername/schengen-visa-bot.git
+cd schengen-visa-bot
+```
+
+2. Gerekli paketleri yükleyin:
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Telegram Bot Token'ı alın:
-   - Telegram'da @BotFather ile konuşun
-   - `/newbot` komutunu kullanarak yeni bir bot oluşturun
-   - Size verilen API token'ı kaydedin
-
-3. `.env.example` dosyasını `.env` olarak kopyalayın ve Telegram Bot Token'ınızı ekleyin:
+3. `.env` dosyasını düzenleyin:
 ```bash
-cp .env.example .env
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+TELEGRAM_CHAT_ID=your_chat_id_here
 ```
 
-4. `.env` dosyasını düzenleyin ve `TELEGRAM_BOT_TOKEN` değerini kendi bot token'ınızla değiştirin.
+## 🎮 Kullanım
 
-## Kullanım
-
-Botu başlatmak için:
+1. Programı başlatın:
 ```bash
 python bot.py
 ```
 
-### Telegram Komutları
+2. Menüden istediğiniz ülkeyi ve şehri seçin
+3. Kontrol sıklığını belirleyin (1-60 dakika arası)
+4. Program çalışmaya başlayacak ve uygun randevu bulunduğunda Telegram üzerinden bildirim alacaksınız
 
-- `/start` - Botu başlat ve randevu takibini aktifleştir
-- `/stop` - Randevu takibini durdur
-- `/help` - Yardım mesajını göster
+## 🔍 Desteklenen Ülkeler
 
-## Güvenlik Notları
+- Fransa
+- Hollanda
+- İrlanda
+- Malta
+- İsveç
+- Çekya
+- Hırvatistan
+- Bulgaristan
+- Finlandiya
+- Slovenya
+- Danimarka
+- Norveç
+- Estonya
+- Litvanya
+- Lüksemburg
+- Ukrayna
+- Letonya
 
-- `.env` dosyanızı asla GitHub'a pushlamayın
-- Bot token'ınızı gizli tutun
-- VFS Global'in kullanım şartlarına uygun kullanmaya özen gösterin
+## 📱 Telegram Bot Kurulumu
 
-## Katkıda Bulunma
+1. Telegram'da [@BotFather](https://t.me/botfather) ile yeni bir bot oluşturun
+2. Bot token'ını alın ve `.env` dosyasına kaydedin
+3. [@userinfobot](https://t.me/userinfobot)'u kullanarak Chat ID'nizi alın
+4. Chat ID'yi `.env` dosyasına kaydedin
 
-1. Bu repository'yi fork edin
-2. Yeni bir branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Değişikliklerinizi commit edin (`git commit -m 'Add some amazing feature'`)
-4. Branch'inizi push edin (`git push origin feature/amazing-feature`)
-5. Bir Pull Request oluşturun 
+## ⚠️ Notlar
+
+- Bot, randevu bulduğunda size Telegram üzerinden bildirim gönderecektir
+- Kontrol sıklığını çok düşük tutmamaya özen gösterin
+- Program çalışırken Ctrl+C ile menüye dönebilirsiniz
+
+## 📄 Lisans
+
+Bu proje MIT lisansı altında lisanslanmıştır. 

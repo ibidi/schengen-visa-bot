@@ -1,0 +1,5 @@
+python-telegram-bot[job-queue]==20.7
+requests==2.31.0
+beautifulsoup4==4.12.2
+python-dotenv==1.0.0
+schedule==1.2.1 

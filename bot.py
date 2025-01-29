@@ -138,10 +138,11 @@ class AppointmentChecker:
             
             markup = types.InlineKeyboardMarkup()
             frequencies = [
-                ('5 dakika', 5),
-                ('15 dakika', 15),
-                ('30 dakika', 30),
-                ('1 saat', 60)
+                ('1 dakika', 1),
+                ('5+1 dakika', 5),
+                ('15+1 dakika', 15),
+                ('30+1 dakika', 30),
+                ('1 saat +1 dakika', 60)
             ]
             for freq_name, freq_value in frequencies:
                 markup.add(types.InlineKeyboardButton(freq_name, callback_data=f"freq_{freq_value}"))
@@ -149,14 +150,15 @@ class AppointmentChecker:
             self.bot.edit_message_text(
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
-                text="⏰ Kontrol sıklığını seçin:",
+                text="⏰ Kontrol sıklığını seçin:\n(Not: 1 dakika hariç diğer seçeneklere +1 dakika eklenir)",
                 reply_markup=markup
             )
 
         @self.bot.callback_query_handler(func=lambda call: call.data.startswith('freq_'))
         def frequency_callback(call):
             frequency = int(call.data.split('_')[1])
-            self.frequency = frequency + 1  # 1 dakika ekstra ekliyoruz
+            # 1 dakika seçildiyse ekstra ekleme yapma
+            self.frequency = frequency if frequency == 1 else frequency + 1
             chat_id = str(call.message.chat.id)
             
             if chat_id in self.active_checks:
@@ -360,6 +362,8 @@ def get_user_input():
     
     # Kontrol sıklığı
     print("\nKontrol sıklığı (dakika):")
+    print("Not: 1 dakika seçerseniz her dakika kontrol edilir.")
+    print("Not: Diğer sürelere otomatik olarak 1 dakika eklenecektir.")
     frequency = int(input("Kaç dakikada bir kontrol edilsin? (1-60): "))
     if frequency < 1 or frequency > 60:
         raise ValueError("Geçersiz kontrol sıklığı! 1-60 dakika arası bir değer girin.")
@@ -375,7 +379,8 @@ def main():
             country, city, frequency = get_user_input()
             checker.country = country
             checker.city = city
-            checker.frequency = frequency + 1  # 1 dakika ekstra ekliyoruz
+            # 1 dakika seçildiyse ekstra ekleme yapma
+            checker.frequency = frequency if frequency == 1 else frequency + 1
             print(f"\n{country} için {city} şehrinde randevu kontrolü başlatılıyor...")
             print(f"Kontrol sıklığı: {checker.frequency} dakika")
             print("\nProgram çalışıyor... Durdurmak için Ctrl+C'ye basın.\n")

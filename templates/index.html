@@ -103,6 +103,27 @@
         updateStatus(data);
     });
 
+    // Yeni bildirim geldiğinde
+    socket.on('new_notification', function(data) {
+        // Bildirim sesi çal
+        const audio = new Audio('/static/notification.mp3');
+        audio.play();
+
+        // Masaüstü bildirimi göster
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('Yeni Randevu Bulundu!', {
+                body: `${data.country} - ${data.city}\n${data.message}`,
+                icon: '/static/notification-icon.png'
+            });
+        }
+
+        // Bildirim mesajını göster
+        showNotification(`🎉 Yeni randevu bulundu!\n${data.country} - ${data.city}\n${data.message}`, 'success');
+        
+        // Logları güncelle
+        updateLogs();
+    });
+
     function updateStatus(data) {
         isChecking = data.is_active;
         const statusDiv = document.getElementById('status');

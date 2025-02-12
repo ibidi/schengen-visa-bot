@@ -218,40 +218,54 @@ def save_notification_settings():
     db.session.commit()
     return jsonify({'success': True})
 
-def send_notification(user_id, country, city, message, appointment_date=None, appointment_link=None):
-    """Bildirim gönder"""
-    notification = Notification(
-        user_id=user_id,
-        country=country,
-        city=city,
-        date=datetime.now(),
-        message=message,
-        appointment_date=appointment_date,
-        appointment_link=appointment_link
-    )
-    db.session.add(notification)
-    db.session.commit()
-    
-    # WebSocket ile anlık bildirim gönder
-    socketio.emit('new_notification', {
-        'message': message,
-        'country': country,
-        'city': city,
-        'date': notification.date.strftime('%Y-%m-%d %H:%M:%S'),
-        'appointment_date': appointment_date,
-        'appointment_link': appointment_link
-    }, room=str(user_id))
-
-# WebSocket olayları
 @socketio.on('connect')
 def handle_connect():
     if current_user.is_authenticated:
-        emit('status_update', {
+        socketio.emit('status_update', {
             'is_active': bool(bot.active_checks.get(current_user.telegram_chat_id)),
             'country': bot.country,
             'city': bot.city,
             'frequency': bot.frequency
-        })
+        }, room=request.sid)
+
+def send_notification(user_id, country, city, message, appointment_date=None, appointment_link=None):
+    """Bildirim gönder"""
+    try:
+        notification = Notification(
+            user_id=user_id,
+            country=country,
+            city=city,
+            date=datetime.now(),
+            message=message,
+            appointment_date=appointment_date,
+            appointment_link=appointment_link,
+            is_read=False
+        )
+        db.session.add(notification)
+        db.session.commit()
+        
+        # WebSocket ile anlık bildirim gönder
+        notification_data = {
+            'id': notification.id,
+            'message': message,
+            'country': country,
+            'city': city,
+            'date': notification.date.strftime('%Y-%m-%d %H:%M:%S'),
+            'appointment_date': appointment_date,
+            'appointment_link': appointment_link
+        }
+        
+        socketio.emit('new_notification', notification_data, broadcast=True)
+        
+        # Telegram bildirimi gönder
+        user = User.query.get(user_id)
+        if user and user.notification_telegram and user.telegram_chat_id:
+            bot.send_notification(message)
+            
+        return True
+    except Exception as e:
+        print(f"Bildirim gönderme hatası: {str(e)}")
+        return False
 
 # Veritabanını oluştur
 with app.app_context():

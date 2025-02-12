@@ -5,29 +5,32 @@ document.addEventListener('DOMContentLoaded', function() {
     const citySelect = document.getElementById('city');
     const frequencySelect = document.getElementById('frequency');
     
-    // Seçimleri localStorage'dan geri yükle
-    if (localStorage.getItem('lastCountry')) {
-        countrySelect.value = localStorage.getItem('lastCountry');
+    // Form elemanları varsa işlemleri yap
+    if (countrySelect && citySelect && frequencySelect) {
+        // Seçimleri localStorage'dan geri yükle
+        if (localStorage.getItem('lastCountry')) {
+            countrySelect.value = localStorage.getItem('lastCountry');
+        }
+        if (localStorage.getItem('lastCity')) {
+            citySelect.value = localStorage.getItem('lastCity');
+        }
+        if (localStorage.getItem('lastFrequency')) {
+            frequencySelect.value = localStorage.getItem('lastFrequency');
+        }
+        
+        // Seçimleri kaydet
+        countrySelect.addEventListener('change', function() {
+            localStorage.setItem('lastCountry', this.value);
+        });
+        
+        citySelect.addEventListener('change', function() {
+            localStorage.setItem('lastCity', this.value);
+        });
+        
+        frequencySelect.addEventListener('change', function() {
+            localStorage.setItem('lastFrequency', this.value);
+        });
     }
-    if (localStorage.getItem('lastCity')) {
-        citySelect.value = localStorage.getItem('lastCity');
-    }
-    if (localStorage.getItem('lastFrequency')) {
-        frequencySelect.value = localStorage.getItem('lastFrequency');
-    }
-    
-    // Seçimleri kaydet
-    countrySelect.addEventListener('change', function() {
-        localStorage.setItem('lastCountry', this.value);
-    });
-    
-    citySelect.addEventListener('change', function() {
-        localStorage.setItem('lastCity', this.value);
-    });
-    
-    frequencySelect.addEventListener('change', function() {
-        localStorage.setItem('lastFrequency', this.value);
-    });
     
     // Form gönderiminde loading durumu
     const checkForm = document.getElementById('checkForm');

@@ -57,10 +57,35 @@ pip install -r requirements.txt
 
 5. `.env` dosyasını düzenleyin:
 ```bash
+# Telegram Bot Ayarları
 TELEGRAM_BOT_TOKEN=your_bot_token_here
 TELEGRAM_CHAT_ID=your_chat_id_here
-FLASK_SECRET_KEY=your_secret_key_here
+
+# VFS Global Giriş Bilgileri (İsteğe bağlı)
+VFS_EMAIL=your_vfs_email@example.com
+VFS_PASSWORD=your_vfs_password
+
+# Flask Güvenlik Anahtarı
+FLASK_SECRET_KEY=generate_a_secure_random_key_here
 ```
+
+6. Güvenli bir Flask Secret Key oluşturun:
+```bash
+# Python konsolunda:
+python -c 'import secrets; print(secrets.token_hex(32))'
+```
+Çıktıyı kopyalayıp `.env` dosyasındaki `FLASK_SECRET_KEY` değeri olarak kullanın.
+
+7. Veritabanını oluşturun:
+```bash
+python create_db.py
+```
+Bu komut:
+- Yeni bir SQLite veritabanı oluşturur
+- Gerekli tabloları oluşturur
+- Varsayılan admin kullanıcısını oluşturur:
+  - Kullanıcı adı: `admin`
+  - Şifre: `admin123`
 
 ## 🎮 Kullanım
 
@@ -152,4 +177,37 @@ Bildirim ayarlarını `/notification_settings` sayfasından özelleştirebilirsi
 
 ## 📄 Lisans
 
-Bu proje MIT lisansı altında lisanslanmıştır. 
+Bu proje MIT lisansı altında lisanslanmıştır.
+
+## 💾 Veritabanı Yönetimi
+
+### Veritabanını Sıfırlama
+Veritabanını tamamen sıfırlamak için:
+```bash
+# Önce uygulamayı durdurun
+rm instance/visa_bot.db  # veya del instance/visa_bot.db (Windows)
+python create_db.py
+```
+
+### Veritabanı Yedekleme
+```bash
+# SQLite veritabanını yedekleme
+cp instance/visa_bot.db instance/visa_bot.db.backup
+```
+
+### Veritabanı Konumu
+- SQLite veritabanı dosyası: `instance/visa_bot.db`
+- Tüm veriler (bildirimler, loglar, kullanıcı ayarları) bu dosyada saklanır
+
+### Veritabanı Tabloları
+1. `user`: Kullanıcı bilgileri ve ayarları
+2. `notification`: Bildirim geçmişi
+3. `appointment_log`: Randevu kontrol logları
+
+### Admin Hesabını Sıfırlama
+Şifrenizi unuttuysanız:
+1. Veritabanını silin: `rm instance/visa_bot.db`
+2. Yeniden oluşturun: `python create_db.py`
+3. Varsayılan bilgilerle giriş yapın:
+   - Kullanıcı adı: `admin`
+   - Şifre: `admin123` 

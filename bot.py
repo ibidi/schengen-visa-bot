@@ -248,11 +248,14 @@ class AppointmentChecker:
             
             self.start_checking(chat_id)
             
+            # Ülke ismini doğru sözlükten al
+            country_name = self.get_country_name(self.country)
+            
             self.bot.edit_message_text(
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
                 text=f"✅ Randevu kontrolü başlatıldı!\n\n"
-                     f"🌍 Ülke: {COUNTRIES_TR[self.country]}\n"
+                     f"🌍 Ülke: {country_name}\n"
                      f"🏢 Şehir: {self.city}\n"
                      f"⏰ Kontrol sıklığı: {self.frequency} dakika\n\n"
                      "Uygun randevu bulunduğunda size bildirim göndereceğim.\n"
@@ -272,9 +275,11 @@ class AppointmentChecker:
         def status_command(message):
             chat_id = str(message.chat.id)
             if chat_id in self.active_checks:
+                # Ülke ismini doğru sözlükten al
+                country_name = self.get_country_name(self.country)
                 status_text = (
                     "📊 Mevcut Kontrol Durumu:\n\n"
-                    f"🌍 Ülke: {COUNTRIES_TR[self.country]}\n"
+                    f"🌍 Ülke: {country_name}\n"
                     f"🏢 Şehir: {self.city}\n"
                     f"⏰ Kontrol sıklığı: {self.frequency} dakika"
                 )
@@ -360,15 +365,44 @@ class AppointmentChecker:
     def check_vfs_appointments(self):
         """VFS Global randevularını kontrol et"""
         headers = {
-            'User-Agent': 'Mozilla/5.0',
-            'Accept': 'application/json'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+            'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Origin': 'https://visa.vfsglobal.com',
+            'Referer': 'https://visa.vfsglobal.com/tur/tr/appointment',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin'
         }
-        response = requests.get(self.apis['vfs'], headers=headers, verify=False)
-        if response.status_code != 200:
-            raise Exception(f"VFS API yanıt vermedi: {response.status_code}")
         
-        appointments = response.json()
-        return self.process_vfs_appointments(appointments)
+        try:
+            response = requests.get(
+                f"{self.apis['vfs']}/{self.country.lower()}/tr/appointment",
+                headers=headers,
+                verify=False,
+                timeout=30
+            )
+            
+            if response.status_code == 403:
+                logger.warning("VFS API erişim engeli. Farklı bir User-Agent ile tekrar deneniyor...")
+                # Alternatif User-Agent ile tekrar dene
+                headers['User-Agent'] = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+                response = requests.get(
+                    f"{self.apis['vfs']}/{self.country.lower()}/tr/appointment",
+                    headers=headers,
+                    verify=False,
+                    timeout=30
+                )
+            
+            if response.status_code != 200:
+                raise Exception(f"VFS API yanıt vermedi: {response.status_code}")
+            
+            appointments = response.json()
+            return self.process_vfs_appointments(appointments)
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"VFS API bağlantı hatası: {str(e)}")
+            raise Exception(f"VFS API bağlantı hatası: {str(e)}")
 
     def check_italy_appointments(self):
         """İtalya randevularını kontrol et"""

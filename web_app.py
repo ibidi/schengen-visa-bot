@@ -64,6 +64,10 @@ class User(UserMixin, db.Model):
     notification_sound = db.Column(db.Boolean, default=True)
     notification_desktop = db.Column(db.Boolean, default=True)
     notification_telegram = db.Column(db.Boolean, default=True)
+    
+    @property
+    def unread_notifications(self):
+        return Notification.query.filter_by(user_id=self.id, is_read=False).count()
 
 class AppointmentLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)

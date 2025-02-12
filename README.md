@@ -1,21 +1,30 @@
 # 🌍 Schengen Vize Randevu Kontrol Botu
 
-Bu bot, Schengen vizesi için randevu kontrolü yapmanızı sağlayan bir Python uygulamasıdır. Bot, belirtilen ülke ve şehir için düzenli aralıklarla randevu kontrolü yapar ve uygun randevu bulunduğunda Telegram üzerinden bildirim gönderir.
+Bu bot, Schengen vizesi için randevu kontrolü yapmanızı sağlayan bir Python uygulamasıdır. Bot, belirtilen ülke ve şehir için düzenli aralıklarla randevu kontrolü yapar ve uygun randevu bulunduğunda Telegram ve web arayüzü üzerinden bildirim gönderir.
 
 ## 🚀 Özellikler
 
 - 17 farklı Schengen ülkesi için randevu kontrolü
 - 8 farklı Türkiye şehrinden randevu arama
-- Telegram üzerinden anlık bildirimler
-- Özelleştirilebilir kontrol sıklığı
-- Kullanıcı dostu menü arayüzü
+- Çoklu bildirim sistemi:
+  - 🔔 Web arayüzünde anlık bildirimler
+  - 🎵 Sesli bildirimler
+  - 🖥️ Masaüstü bildirimleri
+  - 📱 Telegram bildirimleri
+- Bildirim geçmişi ve yönetimi
+- Özelleştirilebilir bildirim ayarları
+- Gerçek zamanlı durum güncellemeleri
+- Kullanıcı dostu web arayüzü
 - Terminal veya Telegram bot modu seçeneği
+- WebSocket ile anlık iletişim
+- Otomatik log kaydı ve takibi
 
 ## 📋 Gereksinimler
 
 - Python 3.8 - 3.11 arası bir sürüm (3.13 desteklenmemektedir)
 - Telegram Bot Token
 - Telegram Chat ID
+- Modern bir web tarayıcısı (Chrome, Firefox, Safari, Edge)
 
 ## 🛠️ Kurulum
 
@@ -50,30 +59,44 @@ pip install -r requirements.txt
 ```bash
 TELEGRAM_BOT_TOKEN=your_bot_token_here
 TELEGRAM_CHAT_ID=your_chat_id_here
+FLASK_SECRET_KEY=your_secret_key_here
 ```
 
 ## 🎮 Kullanım
 
 Bot iki farklı modda çalıştırılabilir:
 
-### 1. Telegram Bot Modu
+### 1. Web Arayüzü Modu
+Bu mod, web tarayıcısı üzerinden kontrol edilebilen bir arayüz sunar.
+```bash
+python web_app.py
+```
+Tarayıcınızda `http://localhost:5000` adresine gidin.
+
+### 2. Telegram Bot Modu
 Bu mod, Telegram üzerinden komutlarla kontrol edilebilen bir bot başlatır.
 ```bash
 python bot.py
 ```
 
-### 2. Terminal Modu
+### 3. Terminal Modu
 Bu mod, terminal üzerinden kontrol edilebilen bir arayüz sunar.
 ```bash
 python bot.py --terminal
 ```
 
-### Kontrol Sıklığı
-Bot, seçtiğiniz kontrol sıklığına otomatik olarak 1 dakika ekler. Örneğin:
-- 5 dakika seçerseniz, kontrol 6 dakikada bir yapılacak
-- 15 dakika seçerseniz, kontrol 16 dakikada bir yapılacak
+## 🔔 Bildirim Sistemi
 
-## 🤖 Telegram Bot Komutları
+Bot şu bildirim kanallarını destekler:
+
+1. **Web Bildirimleri**: Web arayüzünde anlık pop-up bildirimler
+2. **Sesli Bildirimler**: Randevu bulunduğunda sesli uyarı
+3. **Masaüstü Bildirimleri**: Tarayıcı üzerinden masaüstü bildirimleri
+4. **Telegram Bildirimleri**: Telegram üzerinden mesaj bildirimleri
+
+Bildirim ayarlarını `/notification_settings` sayfasından özelleştirebilirsiniz.
+
+## 📱 Telegram Bot Komutları
 
 - `/start` - Yeni randevu kontrolü başlat
 - `/stop` - Aktif kontrolleri durdur
@@ -89,13 +112,15 @@ Bot, seçtiğiniz kontrol sıklığına otomatik olarak 1 dakika ekler. Örneği
 
 ## ⚠️ Notlar
 
-- Bot, randevu bulduğunda size Telegram üzerinden bildirim gönderecektir
+- Bot, randevu bulduğunda size tüm bildirim kanalları üzerinden haber verecektir
+- Masaüstü bildirimleri için tarayıcı izinlerini vermeniz gerekir
 - Kontrol sıklığını çok düşük tutmamaya özen gösterin
 - Program çalışırken Ctrl+C ile durdurabilirsiniz
 - SSL sertifika uyarıları otomatik olarak gizlenmektedir
 
 ## 🔍 Desteklenen Ülkeler
 
+### 🇪🇺 Schengen Ülkeleri
 - Fransa
 - Hollanda
 - İrlanda
@@ -113,6 +138,17 @@ Bot, seçtiğiniz kontrol sıklığına otomatik olarak 1 dakika ekler. Örneği
 - Lüksemburg
 - Ukrayna
 - Letonya
+
+### 🌏 VFS Global Ülkeleri
+- İngiltere
+- Kanada
+- Avustralya
+- Yeni Zelanda
+- Güney Afrika
+
+### 🌍 Diğer Ülkeler
+- İtalya
+- Almanya
 
 ## 📄 Lisans
 

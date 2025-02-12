@@ -321,6 +321,7 @@ class AppointmentChecker:
         try:
             # Ülke grubunu belirle
             api_group = self.determine_api_group()
+            logger.info(f"API Grubu: {api_group}, Ülke: {self.country}, Şehir: {self.city}")
             
             if api_group == 'schengen':
                 return self.check_schengen_appointments()
@@ -330,6 +331,9 @@ class AppointmentChecker:
                 return self.check_italy_appointments()
             elif api_group == 'germany':
                 return self.check_germany_appointments()
+            else:
+                logger.error(f"Desteklenmeyen API grubu: {api_group}")
+                return False
             
         except Exception as e:
             error_message = f"❌ API kontrolü sırasında hata: {str(e)}"
@@ -394,62 +398,100 @@ class AppointmentChecker:
 
     def process_schengen_appointments(self, appointments):
         """Schengen randevularını işle"""
-        available_appointments = []
-        for appointment in appointments:
-            if (appointment['source_country'] == 'Turkiye' and 
-                appointment['mission_country'].lower() == self.country.lower() and 
-                self.city.lower() in appointment['center_name'].lower()):
-                
-                available_appointments.append({
-                    'country': appointment['mission_country'],
-                    'city': appointment['center_name'],
-                    'date': appointment['appointment_date'],
-                    'category': appointment['visa_category'],
-                    'subcategory': appointment['visa_subcategory'],
-                    'link': appointment['book_now_link']
-                })
-        
-        return self.send_appointment_notifications(available_appointments)
+        try:
+            available_appointments = []
+            if not appointments:
+                logger.warning("Schengen API boş yanıt döndürdü")
+                return False
+
+            for appointment in appointments:
+                try:
+                    if not all(key in appointment for key in ['source_country', 'mission_country', 'center_name']):
+                        continue
+
+                    if (appointment['source_country'] == 'Turkiye' and 
+                        appointment['mission_country'].lower() == self.country.lower() and 
+                        self.city.lower() in appointment['center_name'].lower()):
+                        
+                        appt_data = {
+                            'country': appointment['mission_country'],
+                            'city': appointment['center_name'],
+                            'date': appointment.get('appointment_date', 'Tarih belirtilmemiş'),
+                            'category': appointment.get('visa_category', 'Kategori belirtilmemiş'),
+                            'subcategory': appointment.get('visa_subcategory', ''),
+                            'link': appointment.get('book_now_link', self.apis['schengen'])
+                        }
+                        available_appointments.append(appt_data)
+                except Exception as e:
+                    logger.error(f"Randevu işlenirken hata: {str(e)}")
+                    continue
+            
+            return self.send_appointment_notifications(available_appointments)
+        except Exception as e:
+            logger.error(f"Schengen randevuları işlenirken hata: {str(e)}")
+            return False
 
     def process_vfs_appointments(self, appointments):
         """VFS randevularını işle"""
-        available_appointments = []
-        for appointment in appointments.get('data', []):
-            if appointment.get('available'):
-                available_appointments.append({
-                    'country': self.country,
-                    'city': appointment.get('location', self.city),
-                    'date': appointment.get('date'),
-                    'category': 'Vize Başvurusu',
-                    'subcategory': appointment.get('type'),
-                    'link': appointment.get('booking_link', self.apis['vfs'])
-                })
-        
-        return self.send_appointment_notifications(available_appointments)
+        try:
+            available_appointments = []
+            if not appointments or 'data' not in appointments:
+                logger.warning("VFS API boş yanıt döndürdü veya data alanı eksik")
+                return False
+
+            for appointment in appointments.get('data', []):
+                try:
+                    if appointment.get('available'):
+                        appt_data = {
+                            'country': self.country,
+                            'city': appointment.get('location', self.city),
+                            'date': appointment.get('date', 'Tarih belirtilmemiş'),
+                            'category': 'Vize Başvurusu',
+                            'subcategory': appointment.get('type', ''),
+                            'link': appointment.get('booking_link', self.apis['vfs'])
+                        }
+                        available_appointments.append(appt_data)
+                except Exception as e:
+                    logger.error(f"VFS randevusu işlenirken hata: {str(e)}")
+                    continue
+            
+            return self.send_appointment_notifications(available_appointments)
+        except Exception as e:
+            logger.error(f"VFS randevuları işlenirken hata: {str(e)}")
+            return False
 
     def send_appointment_notifications(self, appointments):
         """Randevu bildirimlerini gönder"""
-        if appointments:
-            appointments.sort(key=lambda x: x['date'])
+        try:
+            if not appointments:
+                logger.info(f"Uygun randevu bulunamadı: {self.country} - {self.city}")
+                return False
+
+            # Tarihe göre sırala (None değerleri en sona at)
+            appointments.sort(key=lambda x: x.get('date', '') or '')
             
             for appt in appointments:
-                country_name = self.get_country_name(appt['country'])
-                formatted_date = format_date(appt['date'])
+                try:
+                    country_name = self.get_country_name(appt.get('country', self.country))
+                    formatted_date = format_date(appt.get('date', 'Tarih belirtilmemiş'))
 
-                message = f"🎉 {country_name} için randevu bulundu!\n\n"
-                message += f"🏢 Merkez: {appt['city']}\n"
-                message += f"📅 Tarih: {formatted_date}\n"
-                message += f"📋 Kategori: {appt['category']}\n"
-                if appt.get('subcategory'):
-                    message += f"📝 Alt Kategori: {appt['subcategory']}\n"
-                message += f"\n🔗 Randevu Linki:\n{appt['link']}"
-                
-                self.send_notification(message)
+                    message = f"🎉 {country_name} için randevu bulundu!\n\n"
+                    message += f"🏢 Merkez: {appt.get('city', self.city)}\n"
+                    message += f"📅 Tarih: {formatted_date}\n"
+                    message += f"📋 Kategori: {appt.get('category', 'Belirtilmemiş')}\n"
+                    if appt.get('subcategory'):
+                        message += f"📝 Alt Kategori: {appt['subcategory']}\n"
+                    message += f"\n🔗 Randevu Linki:\n{appt.get('link', 'Link mevcut değil')}"
+                    
+                    self.send_notification(message)
+                except Exception as e:
+                    logger.error(f"Bildirim oluşturulurken hata: {str(e)}")
+                    continue
             
             return True
-        
-        logger.info(f"Uygun randevu bulunamadı: {self.country} - {self.city}")
-        return False
+        except Exception as e:
+            logger.error(f"Bildirimler gönderilirken hata: {str(e)}")
+            return False
 
     def get_country_name(self, country_code):
         """Ülke koduna göre Türkçe ismi getir"""

@@ -407,15 +407,50 @@ class AppointmentChecker:
     def check_italy_appointments(self):
         """İtalya randevularını kontrol et"""
         headers = {
-            'User-Agent': 'Mozilla/5.0',
-            'Accept': 'application/json'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+            'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Origin': 'https://prenotami.esteri.it',
+            'Referer': 'https://prenotami.esteri.it/Services',
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin'
         }
-        response = requests.get(self.apis['italy'], headers=headers, verify=False)
-        if response.status_code != 200:
-            raise Exception(f"İtalya API yanıt vermedi: {response.status_code}")
         
-        appointments = response.json()
-        return self.process_italy_appointments(appointments)
+        try:
+            # Önce oturum açma sayfasına istek at
+            session = requests.Session()
+            session.headers.update(headers)
+            
+            # Ana sayfaya git ve CSRF token al
+            response = session.get('https://prenotami.esteri.it/', verify=False, timeout=30)
+            if response.status_code != 200:
+                raise Exception(f"İtalya ana sayfasına erişilemedi: {response.status_code}")
+            
+            # Randevu API'sine istek at
+            api_url = f"{self.apis['italy']}?office={self.city}&service=2"  # service=2 genellikle vize servisi
+            response = session.get(api_url, verify=False, timeout=30)
+            
+            if response.status_code == 500:
+                logger.warning("İtalya API'si şu anda hizmet veremiyor. Daha sonra tekrar denenecek.")
+                return False
+            elif response.status_code != 200:
+                raise Exception(f"İtalya API yanıt vermedi: {response.status_code}")
+            
+            try:
+                appointments = response.json()
+                return self.process_italy_appointments(appointments)
+            except json.JSONDecodeError:
+                logger.error("İtalya API'si geçersiz JSON yanıtı döndürdü")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"İtalya API bağlantı hatası: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"İtalya randevu kontrolü sırasında hata: {str(e)}")
+            return False
 
     def check_germany_appointments(self):
         """Almanya randevularını kontrol et"""
@@ -492,6 +527,38 @@ class AppointmentChecker:
             return self.send_appointment_notifications(available_appointments)
         except Exception as e:
             logger.error(f"VFS randevuları işlenirken hata: {str(e)}")
+            return False
+
+    def process_italy_appointments(self, appointments):
+        """İtalya randevularını işle"""
+        try:
+            available_appointments = []
+            if not appointments:
+                logger.warning("İtalya API boş yanıt döndürdü")
+                return False
+
+            # İtalya API'sinin yanıt formatına göre işle
+            for date, slots in appointments.items():
+                if slots and isinstance(slots, list):
+                    for slot in slots:
+                        try:
+                            if slot.get('available', False):
+                                appt_data = {
+                                    'country': self.country,
+                                    'city': self.city,
+                                    'date': date,
+                                    'category': 'Vize Başvurusu',
+                                    'subcategory': slot.get('service_type', ''),
+                                    'link': 'https://prenotami.esteri.it/Services/Booking'
+                                }
+                                available_appointments.append(appt_data)
+                        except Exception as e:
+                            logger.error(f"İtalya randevusu işlenirken hata: {str(e)}")
+                            continue
+
+            return self.send_appointment_notifications(available_appointments)
+        except Exception as e:
+            logger.error(f"İtalya randevuları işlenirken hata: {str(e)}")
             return False
 
     def send_appointment_notifications(self, appointments):

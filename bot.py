@@ -93,17 +93,95 @@ class AppointmentChecker:
         self.frequency = None
         self.running = False
         self.task = None
-        self.active_checks = {}  # chat_id: task dictionary
+        self.active_checks = {}
         self.setup_handlers()
         self.loop = None
+        
+        # API URL'leri
+        self.apis = {
+            'schengen': "https://api.schengenvisaappointments.com/api/visa-list/?format=json",
+            'vfs': "https://visa.vfsglobal.com/tur/tr/api/appointments",
+            'italy': "https://prenotami.esteri.it/api/schedule",
+            'germany': "https://service2.diplo.de/rktermin/extern/appointment_showMonth.do"
+        }
+        
+        # Ülke grupları
+        self.country_groups = {
+            'schengen': COUNTRIES_TR,
+            'vfs': {
+                'UK': 'İngiltere',
+                'CAN': 'Kanada',
+                'AUS': 'Avustralya',
+                'NZL': 'Yeni Zelanda',
+                'ZAF': 'Güney Afrika'
+            },
+            'italy': {'ITA': 'İtalya'},
+            'germany': {'DEU': 'Almanya'}
+        }
 
     def setup_handlers(self):
         @self.bot.message_handler(commands=['start'])
         def start_command(message):
             markup = types.InlineKeyboardMarkup()
-            for country_code, country_name in COUNTRIES_TR.items():
-                markup.add(types.InlineKeyboardButton(country_name, callback_data=f"country_{country_code}"))
-            self.bot.send_message(message.chat.id, "🌍 Hoş geldiniz! Lütfen randevu kontrolü yapmak istediğiniz ülkeyi seçin:", reply_markup=markup)
+            
+            # Kategori butonları
+            markup.add(types.InlineKeyboardButton("🇪🇺 Schengen Ülkeleri", callback_data="category_schengen"))
+            markup.add(types.InlineKeyboardButton("🌏 VFS Global Ülkeleri", callback_data="category_vfs"))
+            markup.add(types.InlineKeyboardButton("🌍 Diğer Ülkeler", callback_data="category_other"))
+            
+            self.bot.send_message(
+                message.chat.id, 
+                "🌍 Hoş geldiniz!\nLütfen randevu kontrolü yapmak istediğiniz ülke kategorisini seçin:",
+                reply_markup=markup
+            )
+
+        @self.bot.callback_query_handler(func=lambda call: call.data.startswith('category_'))
+        def category_callback(call):
+            category = call.data.split('_')[1]
+            markup = types.InlineKeyboardMarkup()
+            
+            if category == 'schengen':
+                # Schengen ülkeleri
+                for country_code, country_name in COUNTRIES_TR.items():
+                    markup.add(types.InlineKeyboardButton(country_name, callback_data=f"country_{country_code}"))
+                text = "🇪🇺 Lütfen Schengen ülkesini seçin:"
+            
+            elif category == 'vfs':
+                # VFS Global ülkeleri
+                for country_code, country_name in self.country_groups['vfs'].items():
+                    markup.add(types.InlineKeyboardButton(country_name, callback_data=f"country_{country_code}"))
+                text = "🌏 Lütfen VFS Global ülkesini seçin:"
+            
+            elif category == 'other':
+                # Diğer ülkeler (İtalya ve Almanya)
+                other_countries = {**self.country_groups['italy'], **self.country_groups['germany']}
+                for country_code, country_name in other_countries.items():
+                    markup.add(types.InlineKeyboardButton(country_name, callback_data=f"country_{country_code}"))
+                text = "🌍 Lütfen ülke seçin:"
+            
+            # Geri dönüş butonu
+            markup.add(types.InlineKeyboardButton("⬅️ Geri", callback_data="back_to_categories"))
+            
+            self.bot.edit_message_text(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                text=text,
+                reply_markup=markup
+            )
+
+        @self.bot.callback_query_handler(func=lambda call: call.data == 'back_to_categories')
+        def back_to_categories(call):
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("🇪🇺 Schengen Ülkeleri", callback_data="category_schengen"))
+            markup.add(types.InlineKeyboardButton("🌏 VFS Global Ülkeleri", callback_data="category_vfs"))
+            markup.add(types.InlineKeyboardButton("🌍 Diğer Ülkeler", callback_data="category_other"))
+            
+            self.bot.edit_message_text(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                text="🌍 Lütfen randevu kontrolü yapmak istediğiniz ülke kategorisini seçin:",
+                reply_markup=markup
+            )
 
         @self.bot.callback_query_handler(func=lambda call: call.data.startswith('country_'))
         def country_callback(call):
@@ -124,10 +202,14 @@ class AppointmentChecker:
             for city_code, city_name in cities.items():
                 markup.add(types.InlineKeyboardButton(city_name, callback_data=f"city_{city_name}"))
             
+            # Geri dönüş butonu
+            markup.add(types.InlineKeyboardButton("⬅️ Geri", callback_data="back_to_categories"))
+            
+            country_name = self.get_country_name(country)
             self.bot.edit_message_text(
                 chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
-                text=f"🏢 {COUNTRIES_TR[country]} için şehir seçin:",
+                text=f"🏢 {country_name} için şehir seçin:",
                 reply_markup=markup
             )
 
@@ -237,58 +319,144 @@ class AppointmentChecker:
     def check_appointments_sync(self):
         """Senkron randevu kontrolü"""
         try:
-            response = requests.get(API_URL, verify=False)
-            if response.status_code != 200:
-                raise Exception(f"API yanıt vermedi: {response.status_code}")
+            # Ülke grubunu belirle
+            api_group = self.determine_api_group()
             
-            appointments = response.json()
-            available_appointments = []
+            if api_group == 'schengen':
+                return self.check_schengen_appointments()
+            elif api_group == 'vfs':
+                return self.check_vfs_appointments()
+            elif api_group == 'italy':
+                return self.check_italy_appointments()
+            elif api_group == 'germany':
+                return self.check_germany_appointments()
             
-            for appointment in appointments:
-                appointment_date = appointment.get('appointment_date')
-                if not appointment_date:
-                    continue
-                
-                if (appointment['source_country'] == 'Turkiye' and 
-                    appointment['mission_country'].lower() == self.country.lower() and 
-                    self.city.lower() in appointment['center_name'].lower()):
-                    
-                    available_appointments.append({
-                        'country': appointment['mission_country'],
-                        'city': appointment['center_name'],
-                        'date': appointment_date,
-                        'category': appointment['visa_category'],
-                        'subcategory': appointment['visa_subcategory'],
-                        'link': appointment['book_now_link']
-                    })
-
-            if available_appointments:
-                available_appointments.sort(key=lambda x: x['date'])
-                
-                for appt in available_appointments:
-                    country_tr = COUNTRIES_TR.get(appt['country'], appt['country'])
-                    formatted_date = format_date(appt['date'])
-
-                    message = f"🎉 {country_tr} için randevu bulundu!\n\n"
-                    message += f"🏢 Merkez: {appt['city']}\n"
-                    message += f"📅 Tarih: {formatted_date}\n"
-                    message += f"📋 Kategori: {appt['category']}\n"
-                    if appt['subcategory']:
-                        message += f"📝 Alt Kategori: {appt['subcategory']}\n"
-                    message += f"\n🔗 Randevu Linki:\n{appt['link']}"
-                    
-                    self.send_notification(message)
-                
-                return True
-            
-            logger.info(f"Uygun randevu bulunamadı: {self.country} - {self.city}")
-            return False
-
         except Exception as e:
             error_message = f"❌ API kontrolü sırasında hata: {str(e)}"
             logger.error(error_message)
             self.send_notification(error_message)
             return False
+
+    def determine_api_group(self):
+        """Ülkenin hangi API grubuna ait olduğunu belirle"""
+        for group, countries in self.country_groups.items():
+            if self.country in countries:
+                return group
+        return 'schengen'  # varsayılan olarak schengen
+
+    def check_schengen_appointments(self):
+        """Schengen randevularını kontrol et"""
+        response = requests.get(self.apis['schengen'], verify=False)
+        if response.status_code != 200:
+            raise Exception(f"Schengen API yanıt vermedi: {response.status_code}")
+        
+        appointments = response.json()
+        return self.process_schengen_appointments(appointments)
+
+    def check_vfs_appointments(self):
+        """VFS Global randevularını kontrol et"""
+        headers = {
+            'User-Agent': 'Mozilla/5.0',
+            'Accept': 'application/json'
+        }
+        response = requests.get(self.apis['vfs'], headers=headers, verify=False)
+        if response.status_code != 200:
+            raise Exception(f"VFS API yanıt vermedi: {response.status_code}")
+        
+        appointments = response.json()
+        return self.process_vfs_appointments(appointments)
+
+    def check_italy_appointments(self):
+        """İtalya randevularını kontrol et"""
+        headers = {
+            'User-Agent': 'Mozilla/5.0',
+            'Accept': 'application/json'
+        }
+        response = requests.get(self.apis['italy'], headers=headers, verify=False)
+        if response.status_code != 200:
+            raise Exception(f"İtalya API yanıt vermedi: {response.status_code}")
+        
+        appointments = response.json()
+        return self.process_italy_appointments(appointments)
+
+    def check_germany_appointments(self):
+        """Almanya randevularını kontrol et"""
+        headers = {
+            'User-Agent': 'Mozilla/5.0',
+            'Accept': 'text/html'
+        }
+        response = requests.get(self.apis['germany'], headers=headers, verify=False)
+        if response.status_code != 200:
+            raise Exception(f"Almanya API yanıt vermedi: {response.status_code}")
+        
+        # HTML parse etme işlemi gerekebilir
+        return self.process_germany_appointments(response.text)
+
+    def process_schengen_appointments(self, appointments):
+        """Schengen randevularını işle"""
+        available_appointments = []
+        for appointment in appointments:
+            if (appointment['source_country'] == 'Turkiye' and 
+                appointment['mission_country'].lower() == self.country.lower() and 
+                self.city.lower() in appointment['center_name'].lower()):
+                
+                available_appointments.append({
+                    'country': appointment['mission_country'],
+                    'city': appointment['center_name'],
+                    'date': appointment['appointment_date'],
+                    'category': appointment['visa_category'],
+                    'subcategory': appointment['visa_subcategory'],
+                    'link': appointment['book_now_link']
+                })
+        
+        return self.send_appointment_notifications(available_appointments)
+
+    def process_vfs_appointments(self, appointments):
+        """VFS randevularını işle"""
+        available_appointments = []
+        for appointment in appointments.get('data', []):
+            if appointment.get('available'):
+                available_appointments.append({
+                    'country': self.country,
+                    'city': appointment.get('location', self.city),
+                    'date': appointment.get('date'),
+                    'category': 'Vize Başvurusu',
+                    'subcategory': appointment.get('type'),
+                    'link': appointment.get('booking_link', self.apis['vfs'])
+                })
+        
+        return self.send_appointment_notifications(available_appointments)
+
+    def send_appointment_notifications(self, appointments):
+        """Randevu bildirimlerini gönder"""
+        if appointments:
+            appointments.sort(key=lambda x: x['date'])
+            
+            for appt in appointments:
+                country_name = self.get_country_name(appt['country'])
+                formatted_date = format_date(appt['date'])
+
+                message = f"🎉 {country_name} için randevu bulundu!\n\n"
+                message += f"🏢 Merkez: {appt['city']}\n"
+                message += f"📅 Tarih: {formatted_date}\n"
+                message += f"📋 Kategori: {appt['category']}\n"
+                if appt.get('subcategory'):
+                    message += f"📝 Alt Kategori: {appt['subcategory']}\n"
+                message += f"\n🔗 Randevu Linki:\n{appt['link']}"
+                
+                self.send_notification(message)
+            
+            return True
+        
+        logger.info(f"Uygun randevu bulunamadı: {self.country} - {self.city}")
+        return False
+
+    def get_country_name(self, country_code):
+        """Ülke koduna göre Türkçe ismi getir"""
+        for group in self.country_groups.values():
+            if country_code in group:
+                return group[country_code]
+        return country_code
 
     def send_notification(self, message):
         """Bildirim gönder"""
@@ -301,11 +469,12 @@ class AppointmentChecker:
 
 def get_user_input():
     """Kullanıcıdan giriş al"""
-    print("\nSchengen Vize Randevu Kontrol Programı")
+    print("\nVize Randevu Kontrol Programı")
     print("=====================================")
     
-    print("\nÜlke seçimi yapın (1-17):")
+    print("\nÜlke seçimi yapın:")
     countries = {
+        # Schengen Ülkeleri
         1: 'France',
         2: 'Netherlands',
         3: 'Ireland',
@@ -322,19 +491,51 @@ def get_user_input():
         14: 'Lithuania',
         15: 'Luxembourg',
         16: 'Ukraine',
-        17: 'Latvia'
+        17: 'Latvia',
+        # VFS Global Ülkeleri
+        18: 'UK',
+        19: 'CAN',
+        20: 'AUS',
+        21: 'NZL',
+        22: 'ZAF',
+        # Diğer Ülkeler
+        23: 'ITA',
+        24: 'DEU'
     }
     
-    for num, country in countries.items():
+    # Ülke isimlerini Türkçe olarak göster
+    country_names = {
+        'UK': 'İngiltere',
+        'CAN': 'Kanada',
+        'AUS': 'Avustralya',
+        'NZL': 'Yeni Zelanda',
+        'ZAF': 'Güney Afrika',
+        'ITA': 'İtalya',
+        'DEU': 'Almanya'
+    }
+    
+    print("\nSchengen Ülkeleri:")
+    for num in range(1, 18):
+        country = countries[num]
         print(f"{num}. {COUNTRIES_TR[country]}")
+    
+    print("\nVFS Global Ülkeleri:")
+    for num in range(18, 23):
+        country = countries[num]
+        print(f"{num}. {country_names[country]}")
+    
+    print("\nDiğer Ülkeler:")
+    for num in range(23, 25):
+        country = countries[num]
+        print(f"{num}. {country_names[country]}")
     
     while True:
         try:
-            country_choice = int(input("\nSeçiminiz (1-17): "))
-            if 1 <= country_choice <= 17:
+            country_choice = int(input("\nSeçiminiz (1-24): "))
+            if 1 <= country_choice <= 24:
                 selected_country = countries[country_choice]
                 break
-            print("Lütfen 1-17 arasında bir sayı girin!")
+            print("Lütfen 1-24 arasında bir sayı girin!")
         except ValueError:
             print("Lütfen geçerli bir sayı girin!")
     

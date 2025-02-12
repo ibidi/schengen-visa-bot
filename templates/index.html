@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4>Randevu Kontrol Paneli</h4>
+            </div>
+            <div class="card-body">
+                <form id="checkForm">
+                    <div class="mb-3">
+                        <label for="country" class="form-label">Ülke</label>
+                        <select class="form-select" id="country" name="country" required>
+                            <option value="">Ülke Seçin</option>
+                            <optgroup label="Schengen Ülkeleri">
+                                {% for code, name in schengen_countries.items() %}
+                                <option value="{{ code }}">{{ name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="VFS Global Ülkeleri">
+                                {% for code, name in vfs_countries.items() %}
+                                <option value="{{ code }}">{{ name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="Diğer Ülkeler">
+                                {% for code, name in other_countries.items() %}
+                                <option value="{{ code }}">{{ name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="city" class="form-label">Şehir</label>
+                        <select class="form-select" id="city" name="city" required>
+                            <option value="">Şehir Seçin</option>
+                            <option value="Ankara">Ankara</option>
+                            <option value="Istanbul">İstanbul</option>
+                            <option value="Izmir">İzmir</option>
+                            <option value="Antalya">Antalya</option>
+                            <option value="Gaziantep">Gaziantep</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="frequency" class="form-label">Kontrol Sıklığı (dakika)</label>
+                        <select class="form-select" id="frequency" name="frequency" required>
+                            <option value="1">1 dakika</option>
+                            <option value="5">5+1 dakika</option>
+                            <option value="15">15+1 dakika</option>
+                            <option value="30">30+1 dakika</option>
+                            <option value="60">1 saat +1 dakika</option>
+                        </select>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary" id="startBtn">Kontrolü Başlat</button>
+                        <button type="button" class="btn btn-danger" id="stopBtn" style="display: none;">Kontrolü Durdur</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4>Durum ve Loglar</h4>
+            </div>
+            <div class="card-body">
+                <div id="status" class="alert alert-info mb-3">
+                    Kontrol durumu bekleniyor...
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Tarih</th>
+                                <th>Ülke</th>
+                                <th>Şehir</th>
+                                <th>Durum</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logTable">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const socket = io();
+    let isChecking = false;
+
+    // Sayfa yüklendiğinde mevcut durumu al
+    fetch('/status')
+        .then(response => response.json())
+        .then(data => updateStatus(data));
+
+    // WebSocket durum güncellemeleri
+    socket.on('status_update', function(data) {
+        updateStatus(data);
+    });
+
+    function updateStatus(data) {
+        isChecking = data.is_active;
+        const statusDiv = document.getElementById('status');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+
+        if (isChecking) {
+            statusDiv.className = 'alert alert-success';
+            statusDiv.textContent = `${data.country} - ${data.city} için kontrol aktif (${data.frequency} dakika)`;
+            startBtn.style.display = 'none';
+            stopBtn.style.display = 'block';
+        } else {
+            statusDiv.className = 'alert alert-info';
+            statusDiv.textContent = 'Kontrol durumu: Pasif';
+            startBtn.style.display = 'block';
+            stopBtn.style.display = 'none';
+        }
+    }
+
+    // Form gönderimi
+    document.getElementById('checkForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = {
+            country: document.getElementById('country').value,
+            city: document.getElementById('city').value,
+            frequency: document.getElementById('frequency').value
+        };
+
+        fetch('/start_check', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert('Hata: ' + data.error);
+            }
+            updateLogs();
+        });
+    });
+
+    // Durdurma butonu
+    document.getElementById('stopBtn').addEventListener('click', function() {
+        fetch('/stop_check', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert('Hata: ' + data.error);
+            }
+            updateLogs();
+        });
+    });
+
+    // Logları güncelle
+    function updateLogs() {
+        fetch('/logs')
+            .then(response => response.json())
+            .then(logs => {
+                const tbody = document.getElementById('logTable');
+                tbody.innerHTML = '';
+                logs.forEach(log => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${log.date}</td>
+                        <td>${log.country}</td>
+                        <td>${log.city}</td>
+                        <td>${log.status}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            });
+    }
+
+    // Periyodik log güncellemesi
+    setInterval(updateLogs, 30000);
+    updateLogs();
+</script>
+{% endblock %} 

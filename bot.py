@@ -364,45 +364,242 @@ class AppointmentChecker:
 
     def check_vfs_appointments(self):
         """VFS Global randevularını kontrol et"""
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json',
+        base_headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Origin': 'https://visa.vfsglobal.com',
-            'Referer': 'https://visa.vfsglobal.com/tur/tr/appointment',
-            'Sec-Fetch-Dest': 'empty',
-            'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Site': 'same-origin'
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
+            'sec-ch-ua': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"macOS"'
         }
         
         try:
-            response = requests.get(
-                f"{self.apis['vfs']}/{self.country.lower()}/tr/appointment",
-                headers=headers,
-                verify=False,
-                timeout=30
-            )
+            # VFS giriş bilgilerini al
+            vfs_email = os.getenv('VFS_EMAIL')
+            vfs_password = os.getenv('VFS_PASSWORD')
             
-            if response.status_code == 403:
-                logger.warning("VFS API erişim engeli. Farklı bir User-Agent ile tekrar deneniyor...")
-                # Alternatif User-Agent ile tekrar dene
-                headers['User-Agent'] = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
-                response = requests.get(
-                    f"{self.apis['vfs']}/{self.country.lower()}/tr/appointment",
-                    headers=headers,
-                    verify=False,
-                    timeout=30
-                )
+            if not vfs_email or not vfs_password:
+                logger.error("VFS giriş bilgileri bulunamadı! Lütfen .env dosyasını kontrol edin.")
+                return False
+            
+            # Oturum başlat
+            session = requests.Session()
+            session.headers.update(base_headers)
+            
+            # Ana sayfaya git ve oturum çerezlerini al
+            base_url = "https://visa.vfsglobal.com/tur/tr"
+            initial_response = session.get(f"{base_url}/", verify=False, timeout=30)
+            
+            if initial_response.status_code != 200:
+                logger.warning(f"VFS ana sayfasına erişilemedi: {initial_response.status_code}")
+                return False
+                
+            # CSRF token kontrolü
+            try:
+                csrf_token = None
+                for cookie in session.cookies:
+                    if cookie.name == 'XSRF-TOKEN':
+                        csrf_token = cookie.value
+                        break
+                
+                if csrf_token:
+                    session.headers.update({
+                        'X-XSRF-TOKEN': csrf_token,
+                        'X-CSRF-TOKEN': csrf_token
+                    })
+                    logger.info("VFS CSRF token başarıyla alındı")
+            except Exception as e:
+                logger.warning(f"VFS CSRF token alınamadı: {str(e)}")
+            
+            # Giriş yap
+            login_url = f"{base_url}/auth/login"  # Temel giriş endpoint'i
+            login_data = {
+                'username': vfs_email,
+                'password': vfs_password,
+                'rememberMe': False,
+                'timeZone': 'Europe/Istanbul'
+            }
+            
+            login_headers = {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Origin': base_url,
+                'Referer': f"{base_url}/login",
+                'X-Requested-With': 'XMLHttpRequest',
+                'Host': 'visa.vfsglobal.com',
+                'Cookie': f'selectedCountry={self.country.lower()};currentLanguage=tr'
+            }
+            session.headers.update(login_headers)
+            
+            # Önce login sayfasına git
+            login_page_response = session.get(f"{base_url}/login", verify=False, timeout=30)
+            if login_page_response.status_code != 200:
+                logger.error(f"VFS login sayfasına erişilemedi: {login_page_response.status_code}")
+                return False
+            
+            # Login isteği gönder
+            login_response = session.post(login_url, json=login_data, verify=False, timeout=30)
+            
+            if login_response.status_code != 200:
+                logger.error(f"VFS giriş yapılamadı: {login_response.status_code}")
+                # Alternatif giriş yöntemi dene
+                alt_login_url = f"{base_url}/api/user/login"
+                alt_login_data = {
+                    'email': vfs_email,
+                    'password': vfs_password,
+                    'type': 'email'
+                }
+                login_response = session.post(alt_login_url, json=alt_login_data, verify=False, timeout=30)
+                if login_response.status_code != 200:
+                    logger.error(f"VFS alternatif giriş de başarısız: {login_response.status_code}")
+                    return False
+            
+            try:
+                login_result = login_response.json()
+                if not login_result.get('success', False) and not login_result.get('token'):
+                    logger.error("VFS giriş başarısız: " + login_result.get('message', 'Bilinmeyen hata'))
+                    return False
+                
+                # Token varsa header'a ekle
+                if login_result.get('token'):
+                    session.headers.update({
+                        'Authorization': f"Bearer {login_result['token']}"
+                    })
+                
+                logger.info("VFS giriş başarılı")
+                
+                # Dashboard'a git ve oturumu doğrula
+                dashboard_response = session.get(f"{base_url}/dashboard", verify=False, timeout=30)
+                if dashboard_response.status_code != 200:
+                    logger.error(f"VFS dashboard erişimi başarısız: {dashboard_response.status_code}")
+                    return False
+                
+                # Çerezleri güncelle
+                session.cookies.update({
+                    'selectedMission': 'tur',
+                    'selectedCountry': self.country.lower(),
+                    'currentLanguage': 'tr',
+                    'loggedIn': 'true'
+                })
+                
+            except json.JSONDecodeError:
+                logger.error("VFS giriş yanıtı JSON formatında değil")
+                return False
+            
+            # API istekleri için header'ları güncelle
+            api_headers = {
+                'Accept': 'application/json, text/plain, */*',
+                'Origin': base_url,
+                'Referer': f"{base_url}/appointment",
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin'
+            }
+            session.headers.update(api_headers)
+            
+            # Ülke verisi al
+            country_url = f"{base_url}/appointment-data/{self.country.lower()}"
+            country_response = session.get(country_url, verify=False, timeout=30)
+            
+            if country_response.status_code != 200:
+                logger.warning(f"VFS ülke verisi alınamadı: {country_response.status_code}")
+                return False
+            
+            try:
+                country_text = country_response.text.strip()
+                if not country_text:
+                    logger.warning("VFS ülke verisi boş")
+                    return False
+                
+                country_data = json.loads(country_text)
+                logger.info(f"VFS ülke verisi başarıyla alındı: {self.country}")
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"VFS ülke verisi JSON formatında değil: {str(e)}")
+                logger.debug(f"Alınan yanıt: {country_text[:200]}...")  # İlk 200 karakteri logla
+                return False
+            
+            # Misyon verisi al
+            mission_url = f"{base_url}/mission-data/{self.country.lower()}"
+            mission_response = session.get(mission_url, verify=False, timeout=30)
+            
+            if mission_response.status_code != 200:
+                logger.warning(f"VFS misyon verisi alınamadı: {mission_response.status_code}")
+                return False
+            
+            try:
+                mission_text = mission_response.text.strip()
+                if not mission_text:
+                    logger.warning("VFS misyon verisi boş")
+                    return False
+                
+                mission_data = json.loads(mission_text)
+                logger.info("VFS misyon verisi başarıyla alındı")
+                
+                if not isinstance(mission_data, dict):
+                    logger.warning("VFS misyon verisi geçersiz format")
+                    return False
+                
+                centers = mission_data.get('centers', [])
+                if not centers:
+                    logger.warning("VFS merkez listesi boş")
+                    return False
+                
+                # Merkez ID'sini bul
+                center_id = None
+                for center in centers:
+                    if isinstance(center, dict) and center.get('city', '').lower() == self.city.lower():
+                        center_id = center.get('id')
+                        break
+                
+                if not center_id:
+                    logger.warning(f"VFS için {self.city} şehrinde merkez bulunamadı")
+                    return False
+                
+                logger.info(f"VFS merkez ID bulundu: {center_id}")
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"VFS misyon verisi JSON formatında değil: {str(e)}")
+                logger.debug(f"Alınan yanıt: {mission_text[:200]}...")  # İlk 200 karakteri logla
+                return False
+            
+            # Randevu kontrolü yap
+            appointments_url = f"{base_url}/appointment/slots"
+            data = {
+                'countryCode': self.country.upper(),
+                'missionCode': 'tur',
+                'centerCode': center_id,
+                'loginUser': True,
+                'visaCategoryCode': 'std'
+            }
+            
+            response = session.post(appointments_url, json=data, verify=False, timeout=30)
             
             if response.status_code != 200:
-                raise Exception(f"VFS API yanıt vermedi: {response.status_code}")
+                logger.warning(f"VFS randevu verisi alınamadı: {response.status_code}")
+                return False
             
-            appointments = response.json()
-            return self.process_vfs_appointments(appointments)
+            try:
+                appointments = response.json()
+                return self.process_vfs_appointments(appointments)
+            except json.JSONDecodeError as e:
+                logger.error(f"VFS randevu verisi JSON formatında değil: {str(e)}")
+                return False
             
         except requests.exceptions.RequestException as e:
             logger.error(f"VFS API bağlantı hatası: {str(e)}")
-            raise Exception(f"VFS API bağlantı hatası: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"VFS randevu kontrolü sırasında hata: {str(e)}")
+            return False
 
     def check_italy_appointments(self):
         """İtalya randevularını kontrol et"""
@@ -455,15 +652,72 @@ class AppointmentChecker:
     def check_germany_appointments(self):
         """Almanya randevularını kontrol et"""
         headers = {
-            'User-Agent': 'Mozilla/5.0',
-            'Accept': 'text/html'
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'max-age=0',
+            'Referer': 'https://service2.diplo.de/rktermin/extern/choose_category.do'
         }
-        response = requests.get(self.apis['germany'], headers=headers, verify=False)
-        if response.status_code != 200:
-            raise Exception(f"Almanya API yanıt vermedi: {response.status_code}")
         
-        # HTML parse etme işlemi gerekebilir
-        return self.process_germany_appointments(response.text)
+        try:
+            session = requests.Session()
+            session.headers.update(headers)
+            
+            # Şehre göre URL'yi belirle
+            city_codes = {
+                'Ankara': 'ank',
+                'Istanbul': 'ist',
+                'Izmir': 'izm'
+            }
+            
+            city_code = city_codes.get(self.city)
+            if not city_code:
+                logger.error(f"Almanya için {self.city} şehrinde hizmet verilmiyor")
+                return False
+                
+            base_url = f"https://service2.diplo.de/rktermin/{city_code}"
+            
+            # Önce kategori seçim sayfasına git
+            initial_response = session.get(f"{base_url}/extern/choose_category.do", verify=False, timeout=30)
+            
+            if initial_response.status_code != 200:
+                raise Exception(f"Almanya API yanıt vermedi: {initial_response.status_code}")
+            
+            # Kategori seçimi yap
+            category_data = {
+                'categoryId': '375',  # Ulusal vize kategorisi
+                'realmId': '523',  # Türkiye bölge ID'si
+                'categoryName': 'Nationales Visum',
+                'preferedDate': '',
+                'captchaText': ''
+            }
+            
+            category_response = session.post(f"{base_url}/extern/choose_category.do", 
+                                          data=category_data, 
+                                          verify=False, 
+                                          timeout=30)
+            
+            if category_response.status_code != 200:
+                raise Exception(f"Almanya kategori seçimi başarısız: {category_response.status_code}")
+            
+            # Randevu takvimini kontrol et
+            calendar_response = session.get(f"{base_url}/extern/appointment_showMonth.do", 
+                                         verify=False, 
+                                         timeout=30)
+            
+            if calendar_response.status_code != 200:
+                raise Exception(f"Almanya randevu takvimi alınamadı: {calendar_response.status_code}")
+            
+            return self.process_germany_appointments(calendar_response.text)
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Almanya API bağlantı hatası: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"Almanya randevu kontrolü sırasında hata: {str(e)}")
+            return False
 
     def process_schengen_appointments(self, appointments):
         """Schengen randevularını işle"""
@@ -504,26 +758,29 @@ class AppointmentChecker:
         """VFS randevularını işle"""
         try:
             available_appointments = []
-            if not appointments or 'data' not in appointments:
-                logger.warning("VFS API boş yanıt döndürdü veya data alanı eksik")
+            if not appointments or not isinstance(appointments, dict):
+                logger.warning("VFS API geçersiz yanıt döndürdü")
                 return False
 
-            for appointment in appointments.get('data', []):
-                try:
-                    if appointment.get('available'):
-                        appt_data = {
-                            'country': self.country,
-                            'city': appointment.get('location', self.city),
-                            'date': appointment.get('date', 'Tarih belirtilmemiş'),
-                            'category': 'Vize Başvurusu',
-                            'subcategory': appointment.get('type', ''),
-                            'link': appointment.get('booking_link', self.apis['vfs'])
-                        }
-                        available_appointments.append(appt_data)
-                except Exception as e:
-                    logger.error(f"VFS randevusu işlenirken hata: {str(e)}")
-                    continue
-            
+            # Yeni VFS API yanıt formatına göre işle
+            dates = appointments.get('dates', [])
+            if isinstance(dates, list):
+                for date_info in dates:
+                    try:
+                        if date_info.get('available', False):
+                            appt_data = {
+                                'country': self.country,
+                                'city': self.city,
+                                'date': date_info.get('date', 'Tarih belirtilmemiş'),
+                                'category': 'Vize Başvurusu',
+                                'subcategory': date_info.get('category', ''),
+                                'link': f"https://visa.vfsglobal.com/tur/tr/vacs-appointment/{self.country.lower()}/schedule"
+                            }
+                            available_appointments.append(appt_data)
+                    except Exception as e:
+                        logger.error(f"VFS randevu tarihi işlenirken hata: {str(e)}")
+                        continue
+
             return self.send_appointment_notifications(available_appointments)
         except Exception as e:
             logger.error(f"VFS randevuları işlenirken hata: {str(e)}")
@@ -559,6 +816,36 @@ class AppointmentChecker:
             return self.send_appointment_notifications(available_appointments)
         except Exception as e:
             logger.error(f"İtalya randevuları işlenirken hata: {str(e)}")
+            return False
+
+    def process_germany_appointments(self, html_content):
+        """Almanya randevularını işle"""
+        try:
+            available_appointments = []
+            
+            # HTML içeriğini kontrol et
+            if not html_content or "Keine freien Termine" in html_content:
+                logger.info("Almanya için uygun randevu bulunamadı")
+                return False
+            
+            # Randevu var mı kontrol et
+            if "Verfügbare Termine" in html_content or "calendar-table" in html_content:
+                # Basit bir randevu bulundu bildirimi oluştur
+                appt_data = {
+                    'country': self.country,
+                    'city': self.city,
+                    'date': 'Randevu mevcut - Detaylar için siteyi ziyaret edin',
+                    'category': 'Vize Başvurusu',
+                    'subcategory': 'Ulusal Vize',
+                    'link': self.apis['germany']
+                }
+                available_appointments.append(appt_data)
+                logger.info("Almanya için randevu bulundu")
+            
+            return self.send_appointment_notifications(available_appointments)
+            
+        except Exception as e:
+            logger.error(f"Almanya randevuları işlenirken hata: {str(e)}")
             return False
 
     def send_appointment_notifications(self, appointments):

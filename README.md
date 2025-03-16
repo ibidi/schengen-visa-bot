@@ -141,7 +141,6 @@ Bildirim ayarlarını `/notification_settings` sayfasından özelleştirebilirsi
 - Masaüstü bildirimleri için tarayıcı izinlerini vermeniz gerekir
 - Kontrol sıklığını çok düşük tutmamaya özen gösterin
 - Program çalışırken Ctrl+C ile durdurabilirsiniz
-- SSL sertifika uyarıları otomatik olarak gizlenmektedir
 
 ## 🔍 Desteklenen Ülkeler
 

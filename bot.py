@@ -102,7 +102,7 @@ class AppointmentChecker:
         self.apis = {
             'schengen': "https://api.schengenvisaappointments.com/api/visa-list/?format=json",
             'vfs': "https://visa.vfsglobal.com/tur/tr/api/appointments",
-            'italy': "https://prenotami.esteri.it/api/schedule",
+            'italy': "https://visa.vfsglobal.com/tur/tr/ita/login",  # İtalya için VFS Global URL'i
             'germany': "https://service2.diplo.de/rktermin/extern/appointment_showMonth.do"
         }
         
@@ -114,7 +114,8 @@ class AppointmentChecker:
                 'CAN': 'Kanada',
                 'AUS': 'Avustralya',
                 'NZL': 'Yeni Zelanda',
-                'ZAF': 'Güney Afrika'
+                'ZAF': 'Güney Afrika',
+                'ITA': 'İtalya'  # İtalya'yı VFS grubuna ekledik
             },
             'italy': {'ITA': 'İtalya'},
             'germany': {'DEU': 'Almanya'}

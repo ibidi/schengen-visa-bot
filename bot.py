@@ -9,6 +9,7 @@ from telebot import types
 from dotenv import load_dotenv
 import time
 import urllib3
+from bs4 import BeautifulSoup
 
 # SSL uyarılarını devre dışı bırak
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -621,32 +622,56 @@ class AppointmentChecker:
             session.headers.update(headers)
             
             # Ana sayfaya git ve CSRF token al
+            logger.info("İtalya ana sayfasına bağlanılıyor...")
             response = session.get('https://prenotami.esteri.it/', verify=False, timeout=30)
             if response.status_code != 200:
+                logger.error(f"İtalya ana sayfasına erişilemedi. Status kod: {response.status_code}, Yanıt: {response.text[:200]}")
                 raise Exception(f"İtalya ana sayfasına erişilemedi: {response.status_code}")
             
+            # CSRF token'ı çıkart
+            logger.info("CSRF token aranıyor...")
+            csrf_token = None
+            try:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                csrf_token = soup.find('input', {'name': '__RequestVerificationToken'})
+                if csrf_token:
+                    csrf_token = csrf_token.get('value')
+                    logger.info("CSRF token bulundu")
+                else:
+                    logger.warning("CSRF token bulunamadı")
+            except Exception as e:
+                logger.error(f"CSRF token çıkarılırken hata: {str(e)}")
+            
             # Randevu API'sine istek at
-            api_url = f"{self.apis['italy']}?office={self.city}&service=2"  # service=2 genellikle vize servisi
+            api_url = f"{self.apis['italy']}?office={self.city}&service=2"
+            logger.info(f"Randevu API'sine istek gönderiliyor: {api_url}")
+            
+            if csrf_token:
+                headers['RequestVerificationToken'] = csrf_token
+            
             response = session.get(api_url, verify=False, timeout=30)
             
+            logger.info(f"API yanıt status kodu: {response.status_code}")
             if response.status_code == 500:
-                logger.warning("İtalya API'si şu anda hizmet veremiyor. Daha sonra tekrar denenecek.")
+                logger.warning(f"İtalya API'si 500 hatası döndürdü. Yanıt: {response.text[:200]}")
                 return False
             elif response.status_code != 200:
+                logger.error(f"İtalya API beklenmeyen yanıt döndürdü. Status: {response.status_code}, Yanıt: {response.text[:200]}")
                 raise Exception(f"İtalya API yanıt vermedi: {response.status_code}")
             
             try:
                 appointments = response.json()
+                logger.info(f"API yanıtı başarıyla alındı. Yanıt uzunluğu: {len(str(appointments))}")
                 return self.process_italy_appointments(appointments)
-            except json.JSONDecodeError:
-                logger.error("İtalya API'si geçersiz JSON yanıtı döndürdü")
+            except json.JSONDecodeError as e:
+                logger.error(f"İtalya API'si geçersiz JSON yanıtı döndürdü. Yanıt: {response.text[:200]}, Hata: {str(e)}")
                 return False
                 
         except requests.exceptions.RequestException as e:
-            logger.error(f"İtalya API bağlantı hatası: {str(e)}")
+            logger.error(f"İtalya API bağlantı hatası: {str(e)}, Detaylar: {type(e).__name__}")
             return False
         except Exception as e:
-            logger.error(f"İtalya randevu kontrolü sırasında hata: {str(e)}")
+            logger.error(f"İtalya randevu kontrolü sırasında hata: {str(e)}, Tip: {type(e).__name__}")
             return False
 
     def check_germany_appointments(self):

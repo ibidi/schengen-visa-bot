@@ -1,6 +1,6 @@
 # Schengen Vize Randevu Kontrol Botu 🌍
 
-Bu bot, Schengen vizesi için randevu kontrolü yapmanızı sağlayan bir Telegram botudur. Bot, belirtilen ülke ve şehir için düzenli olarak randevu kontrolü yapar ve uygun randevu bulunduğunda Telegram üzerinden bildirim gönderir.
+Schengen vizesi için randevu kontrolü yapmanızı sağlayan bir Telegram botudur. Bot, belirtilen ülke ve şehir için düzenli olarak randevu kontrolü yapar ve uygun randevu bulunduğunda Telegram üzerinden bildirim gönderir.
 
 ## Özellikler ✨
 

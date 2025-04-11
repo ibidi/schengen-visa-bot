@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""
-Schengen Vize Randevu Kontrol Botu
-"""
-
 import os
 import sys
 import logging

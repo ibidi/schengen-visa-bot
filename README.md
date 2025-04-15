@@ -128,7 +128,3 @@ Bu proje MIT lisansı altında lisanslanmıştır. Daha fazla bilgi için `LICEN
 ## Katkıda Bulunma 🤝
 
 Her türlü katkıya açığız! Lütfen bir pull request göndermeden önce değişikliklerinizi tartışmak için bir issue açın.
-
-## İletişim 📧
-
-Sorularınız veya önerileriniz için bir GitHub issue açabilirsiniz.

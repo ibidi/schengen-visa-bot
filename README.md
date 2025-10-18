@@ -1,5 +1,27 @@
 # Schengen Vize Randevu Kontrol Botu 🌍
 
+# Hizmet Durumu — Geçici Kesinti
+
+⚠️ **Uyarı:** Bot şu anda çalışmamaktadır.
+
+**Durum:** Botumuz, arka planda ücretsiz olarak kullandığımız *vfs global* servisinin kararsız çalışması nedeniyle hizmet verememektedir. Servis zaman zaman yanıt vermemekte veya bağlantı kesintisi yaşamaktadır; bu yüzden botun fonksiyonları devre dışı kalmıştır.
+
+**Etkilenen alanlar**
+- Otomatik cevap verme
+- Dış servis çağrısı gerektiren tüm özellikler
+- Gerçek zamanlı veri akışı (varsa)
+
+**Neler denendi / öneriler**
+- Servis sağlayıcının durumu takip ediliyor.
+- Geçici çözüm olarak ücretli alternatifler veya farklı ücretsiz servisler değerlendirilebilir — istersen alternatif önerileri repo üzerinde listeleyebilirim.
+- Lokal veya self-hosted bir çözüm tercih ediliyorsa yönergeleri ekleyebilirim.
+
+**Güncelleme**
+Servis normale döndüğünde veya bir çözüm hayata geçirildiğinde bu README güncellenecek ve değişiklikler açıklanacaktır.
+
+(İletişim: `info@ihsanbakidogan.com` veya GitHub üzerinden issue açabilirsiniz.)
+(Linkedin üzerinden beni takip ederek gelişmelerden haberdar olabilirsiniz: https://linkedin.com/in/ibidi)
+
 Schengen vizesi için randevu kontrolü yapmanızı sağlayan bir Telegram botudur. Bot, belirtilen ülke ve şehir için düzenli olarak randevu kontrolü yapar ve uygun randevu bulunduğunda Telegram üzerinden bildirim gönderir.
 
 ## Özellikler ✨

@@ -1,6 +1,6 @@
 # Schengen Vize Randevu Kontrol Botu 🌍
 
-# Hizmet Durumu — Geçici Kesinti
+# Hizmet Durumu — Kalıcı Kesinti Yeni Sürüm Yakında!
 
 ⚠️ **Uyarı:** Bot şu anda çalışmamaktadır.
 
